@@ -1,0 +1,19 @@
+{
+  "id": "dictionary",
+  "name": "Dictionary",
+  "version": "1.0.0",
+  "type": "native",
+  "category": "language",
+  "description": "Look up English word definitions, phonetics, and examples (Free Dictionary API)",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "define_word",
+      "description": "Look up English word definitions, phonetics, and examples"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

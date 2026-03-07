@@ -8,7 +8,13 @@ Template catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP 
 
 | Template | Category | Description | Credentials |
 |----------|----------|-------------|-------------|
-| [weather-openmeteo](templates/weather-openmeteo/) | weather | Current weather and 3-day forecast for any city | None (free API) |
+| [weather-openmeteo](templates/weather-openmeteo/) | weather | Current weather and 3-day forecast for any city | None |
+| [wikipedia](templates/wikipedia/) | knowledge | Search Wikipedia and get article summaries | None |
+| [exchange-rates](templates/exchange-rates/) | finance | Convert currencies using live exchange rates | None |
+| [hackernews](templates/hackernews/) | news | Search Hacker News stories and get top stories | None |
+| [dictionary](templates/dictionary/) | language | English word definitions, phonetics, and examples | None |
+| [ip-geolocation](templates/ip-geolocation/) | network | Get location, ISP, and org info for any IP address | None |
+| [website-check](templates/website-check/) | network | Website health check: load time, security headers, meta tags, structured data | None |
 
 ---
 

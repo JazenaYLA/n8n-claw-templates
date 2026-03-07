@@ -1,0 +1,95 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Hacker News",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Search Hacker News",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst query = (input.query || 'top').trim();\n\ntry {\n  let stories = [];\n\n  if (query.toLowerCase() === 'top' || query === '') {\n    const topIds = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://hacker-news.firebaseio.com/v0/topstories.json'\n    });\n\n    const top5 = topIds.slice(0, 5);\n    for (const id of top5) {\n      const item = await helpers.httpRequest({\n        method: 'GET',\n        url: 'https://hacker-news.firebaseio.com/v0/item/' + id + '.json'\n      });\n      stories.push({\n        title: item.title || '',\n        url: item.url || 'https://news.ycombinator.com/item?id=' + id,\n        points: item.score || 0,\n        author: item.by || '',\n        comments: item.descendants || 0\n      });\n    }\n  } else {\n    const res = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://hn.algolia.com/api/v1/search?query=' + encodeURIComponent(query) + '&tags=story&hitsPerPage=5'\n    });\n\n    for (const hit of (res.hits || [])) {\n      stories.push({\n        title: hit.title || '',\n        url: hit.url || 'https://news.ycombinator.com/item?id=' + hit.objectID,\n        points: hit.points || 0,\n        author: hit.author || '',\n        comments: hit.num_comments || 0\n      });\n    }\n  }\n\n  if (stories.length === 0) {\n    return [{ json: { result: 'No stories found for: ' + query } }];\n  }\n\n  let r = 'Hacker News results' + (query.toLowerCase() === 'top' ? ' (Top Stories)' : ' for \"' + query + '\"') + ':\\n\\n';\n  for (let i = 0; i < stories.length; i++) {\n    const s = stories[i];\n    r += (i + 1) + '. ' + s.title + '\\n';\n    r += '   URL: ' + s.url + '\\n';\n    r += '   Points: ' + s.points + ' | Author: ' + s.author + ' | Comments: ' + s.comments + '\\n\\n';\n  }\n\n  return [{ json: { result: r } }];\n} catch (e) {\n  return [{ json: { error: 'Failed to fetch Hacker News: ' + e.message } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Search Hacker News", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Hacker News",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "hackernews"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "search_hackernews",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "search_hackernews",
+          "description": "Search Hacker News stories or get top stories. Parameter: query (search term, or 'top' for top stories)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "query": "={{ $fromAI('query', 'Search term, or top for top stories', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "Search term, or top for top stories",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "search_hackernews": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

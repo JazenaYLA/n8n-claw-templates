@@ -1,0 +1,19 @@
+{
+  "id": "wikipedia",
+  "name": "Wikipedia",
+  "version": "1.0.0",
+  "type": "native",
+  "category": "knowledge",
+  "description": "Search Wikipedia and get article summaries",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "search_wikipedia",
+      "description": "Search Wikipedia and get article summaries"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "exchange-rates",
+  "name": "Exchange Rates",
+  "version": "1.0.0",
+  "type": "native",
+  "category": "finance",
+  "description": "Convert currencies using live exchange rates (Frankfurter API, free)",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "convert_currency",
+      "description": "Convert currencies using live exchange rates"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

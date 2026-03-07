@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "updated": "2026-03-07",
+  "updated": "2026-03-08",
   "templates": [
     {
       "id": "weather-openmeteo",
@@ -8,6 +8,60 @@
       "type": "native",
       "category": "weather",
       "description": "Current weather and 3-day forecast for any city (Open-Meteo, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "wikipedia",
+      "name": "Wikipedia",
+      "type": "native",
+      "category": "knowledge",
+      "description": "Search Wikipedia and get article summaries",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "exchange-rates",
+      "name": "Exchange Rates",
+      "type": "native",
+      "category": "finance",
+      "description": "Convert currencies using live exchange rates (Frankfurter API, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "hackernews",
+      "name": "Hacker News",
+      "type": "native",
+      "category": "news",
+      "description": "Search Hacker News stories and get top stories",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "dictionary",
+      "name": "Dictionary",
+      "type": "native",
+      "category": "language",
+      "description": "Look up English word definitions, phonetics, and examples (Free Dictionary API)",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "ip-geolocation",
+      "name": "IP Geolocation",
+      "type": "native",
+      "category": "network",
+      "description": "Get location, ISP, and organization info for any IP address (ip-api.com, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "website-check",
+      "name": "Website Check",
+      "type": "native",
+      "category": "network",
+      "description": "Comprehensive website health check: load time benchmark, security headers, meta tags, structured data, and more",
       "credentials_required": [],
       "version": "1.0.0"
     }

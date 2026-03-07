@@ -1,0 +1,19 @@
+{
+  "id": "website-check",
+  "name": "Website Check",
+  "version": "1.0.0",
+  "type": "native",
+  "category": "network",
+  "description": "Comprehensive website health check: load time benchmark, security headers, meta tags, structured data, and more",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "check_website",
+      "description": "Comprehensive website health check with performance, security, and SEO analysis"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

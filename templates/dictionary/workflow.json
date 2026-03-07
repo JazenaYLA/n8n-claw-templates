@@ -1,0 +1,95 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Dictionary",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Define Word",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst word = (input.word || '').trim();\n\nif (!word) {\n  return [{ json: { result: 'Error: No word provided. Please specify a word to look up.' } }];\n}\n\ntry {\n  const data = await helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word),\n    returnFullResponse: true\n  });\n\n  const entries = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;\n\n  if (!Array.isArray(entries) || entries.length === 0) {\n    return [{ json: { result: 'Word not found: ' + word } }];\n  }\n\n  const entry = entries[0];\n  let r = 'Word: ' + (entry.word || word) + '\\n';\n\n  if (entry.phonetic) {\n    r += 'Phonetic: ' + entry.phonetic + '\\n';\n  } else if (entry.phonetics && entry.phonetics.length > 0) {\n    const ph = entry.phonetics.find(p => p.text);\n    if (ph) r += 'Phonetic: ' + ph.text + '\\n';\n  }\n\n  r += '\\n';\n\n  if (entry.meanings && entry.meanings.length > 0) {\n    for (const meaning of entry.meanings) {\n      r += '--- ' + (meaning.partOfSpeech || 'unknown') + ' ---\\n';\n      const defs = (meaning.definitions || []).slice(0, 3);\n      for (let i = 0; i < defs.length; i++) {\n        r += (i + 1) + '. ' + defs[i].definition + '\\n';\n        if (defs[i].example) {\n          r += '   Example: \"' + defs[i].example + '\"\\n';\n        }\n      }\n      r += '\\n';\n    }\n  }\n\n  return [{ json: { result: r.trim() } }];\n} catch (e) {\n  if (e.statusCode === 404 || (e.message && e.message.includes('404'))) {\n    return [{ json: { result: 'Word not found: \"' + word + '\". Please check the spelling and try again.' } }];\n  }\n  return [{ json: { error: 'Dictionary lookup failed: ' + e.message } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Define Word", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Dictionary",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "dictionary"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "define_word",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "define_word",
+          "description": "Look up English word definitions, phonetics, and examples. Parameter: word (the English word to look up)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "word": "={{ $fromAI('word', 'The English word to look up', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "word",
+                "displayName": "word",
+                "type": "string",
+                "description": "The English word to look up",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "define_word": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

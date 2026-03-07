@@ -1,0 +1,95 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Website Check",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Check Website",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nlet url = input.url || 'https://example.com';\nif (!url.startsWith('http')) url = 'https://' + url;\n\n// 1. Performance: 10 requests, measure avg/min/max response time\nconst times = [];\nfor (let i = 0; i < 10; i++) {\n  const start = Date.now();\n  try {\n    await helpers.httpRequest({ method: 'HEAD', url, timeout: 10000 });\n    times.push(Date.now() - start);\n  } catch(e) {\n    times.push(-1); // failed\n  }\n}\nconst validTimes = times.filter(t => t >= 0);\nconst avgTime = validTimes.length ? Math.round(validTimes.reduce((a,b) => a+b, 0) / validTimes.length) : -1;\nconst minTime = validTimes.length ? Math.min(...validTimes) : -1;\nconst maxTime = validTimes.length ? Math.max(...validTimes) : -1;\nconst failedRequests = times.filter(t => t < 0).length;\n\n// 2. Full GET request for content analysis\nlet result;\ntry {\n  result = await helpers.httpRequest({\n    method: 'GET', url,\n    returnFullResponse: true,\n    encoding: 'utf-8',\n    json: false,\n    timeout: 15000,\n    headers: { 'User-Agent': 'n8n-claw Website Checker/1.0' }\n  });\n} catch(e) {\n  return [{ json: { url, error: 'Could not reach website: ' + e.message } }];\n}\n\nconst headers = result.headers || {};\nconst body = typeof result.body === 'string' ? result.body : '';\nconst bodySize = body.length;\n\n// 3. Security headers\nconst security = {\n  https: url.startsWith('https'),\n  hsts: headers['strict-transport-security'] || null,\n  csp: headers['content-security-policy'] ? 'present' : 'missing',\n  xFrameOptions: headers['x-frame-options'] || 'missing',\n  xContentTypeOptions: headers['x-content-type-options'] || 'missing',\n  referrerPolicy: headers['referrer-policy'] || 'missing',\n  xXssProtection: headers['x-xss-protection'] || 'missing'\n};\n\n// Count security score (out of 6)\nlet secScore = 0;\nif (security.https) secScore++;\nif (security.hsts) secScore++;\nif (security.csp !== 'missing') secScore++;\nif (security.xFrameOptions !== 'missing') secScore++;\nif (security.xContentTypeOptions !== 'missing') secScore++;\nif (security.referrerPolicy !== 'missing') secScore++;\n\n// 4. Meta tags & Open Graph\nconst titleMatch = body.match(/<title[^>]*>([^<]+)<\\/title>/i);\nconst title = titleMatch ? titleMatch[1].trim() : null;\n\nconst descMatch = body.match(/<meta\\s+name=[\"']description[\"']\\s+content=[\"']([^\"']*?)[\"']/i) ||\n                  body.match(/<meta\\s+content=[\"']([^\"']*?)[\"']\\s+name=[\"']description[\"']/i);\nconst description = descMatch ? descMatch[1] : null;\n\n// Open Graph\nconst ogTags = {};\nconst ogRegex = /<meta\\s+(?:property|name)=[\"'](og:[^\"']+)[\"']\\s+content=[\"']([^\"']*?)[\"']/gi;\nlet ogMatch;\nwhile ((ogMatch = ogRegex.exec(body)) !== null) { ogTags[ogMatch[1]] = ogMatch[2]; }\n\n// 5. JSON-LD structured data\nconst jsonLdMatches = body.match(/<script\\s+type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/gi) || [];\nconst jsonLd = jsonLdMatches.map(m => {\n  const content = m.match(/>([\\s\\S]*?)<\\/script>/i);\n  if (!content) return null;\n  try { return JSON.parse(content[1]); } catch(e) { return null; }\n}).filter(Boolean);\n\n// 6. robots.txt check\nlet hasRobots = false;\ntry {\n  const robotsUrl = url.replace(/\\/+$/, '').split('/').slice(0, 3).join('/') + '/robots.txt';\n  const rr = await helpers.httpRequest({ method: 'HEAD', url: robotsUrl, timeout: 5000, returnFullResponse: true });\n  hasRobots = rr.statusCode === 200;\n} catch(e) { /* no robots.txt */ }\n\n// 7. Server & tech info\nconst serverInfo = {\n  server: headers['server'] || 'not disclosed',\n  poweredBy: headers['x-powered-by'] || null,\n  contentType: headers['content-type'] || 'unknown',\n  cdn: headers['cf-ray'] ? 'Cloudflare' : headers['x-cdn'] ? headers['x-cdn'] : headers['x-cache'] ? 'CDN detected' : null\n};\n\n// 8. Format output\nlet r = '=== Website Check: ' + url + ' ===\\n\\n';\nr += '--- Performance (10 requests) ---\\n';\nr += 'Avg: ' + avgTime + 'ms | Min: ' + minTime + 'ms | Max: ' + maxTime + 'ms';\nif (failedRequests > 0) r += ' | Failed: ' + failedRequests + '/10';\nr += '\\nStatus: ' + result.statusCode + '\\n';\nr += 'Size: ' + (bodySize > 1024 ? Math.round(bodySize/1024) + ' KB' : bodySize + ' bytes') + '\\n';\n\nr += '\\n--- Security (' + secScore + '/6) ---\\n';\nr += 'HTTPS: ' + (security.https ? 'yes' : 'NO') + '\\n';\nr += 'HSTS: ' + (security.hsts ? 'yes' : 'missing') + '\\n';\nr += 'CSP: ' + security.csp + '\\n';\nr += 'X-Frame-Options: ' + security.xFrameOptions + '\\n';\nr += 'X-Content-Type-Options: ' + security.xContentTypeOptions + '\\n';\nr += 'Referrer-Policy: ' + security.referrerPolicy + '\\n';\n\nr += '\\n--- Meta & SEO ---\\n';\nr += 'Title: ' + (title || 'missing') + '\\n';\nr += 'Description: ' + (description || 'missing') + '\\n';\nif (Object.keys(ogTags).length > 0) {\n  r += 'Open Graph: ' + Object.entries(ogTags).map(([k,v]) => k + '=' + v).join(', ') + '\\n';\n} else {\n  r += 'Open Graph: none\\n';\n}\nr += 'JSON-LD: ' + (jsonLd.length > 0 ? jsonLd.length + ' block(s) found' : 'none') + '\\n';\n\nr += '\\n--- Technical ---\\n';\nr += 'Server: ' + serverInfo.server + '\\n';\nif (serverInfo.poweredBy) r += 'Powered-By: ' + serverInfo.poweredBy + '\\n';\nif (serverInfo.cdn) r += 'CDN: ' + serverInfo.cdn + '\\n';\nr += 'robots.txt: ' + (hasRobots ? 'present' : 'missing') + '\\n';\n\nreturn [{ json: { result: r } }];"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Check Website", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Website Check",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "website-check"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "check_website",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "check_website",
+          "description": "Comprehensive website health check. Measures load time (10 requests), checks security headers, extracts meta tags and Open Graph data, checks for JSON-LD structured data, robots.txt, and server info. Parameter: url (website URL to check)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "url": "={{ $fromAI('url', 'The URL to check', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "url",
+                "displayName": "url",
+                "type": "string",
+                "description": "The URL to check",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "check_website": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

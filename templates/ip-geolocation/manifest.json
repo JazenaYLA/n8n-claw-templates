@@ -1,0 +1,19 @@
+{
+  "id": "ip-geolocation",
+  "name": "IP Geolocation",
+  "version": "1.0.0",
+  "type": "native",
+  "category": "network",
+  "description": "Get location, ISP, and organization info for any IP address (ip-api.com, free)",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "geolocate_ip",
+      "description": "Get location, ISP, and organization info for an IP address"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

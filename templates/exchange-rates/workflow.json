@@ -1,0 +1,111 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Exchange Rates",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Convert Currency",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst from = (input.from || 'EUR').toUpperCase();\nconst to = (input.to || '').toUpperCase();\nconst amount = parseFloat(input.amount) || 1;\n\ntry {\n  let url = 'https://api.frankfurter.app/latest?from=' + encodeURIComponent(from) + '&amount=' + amount;\n  if (to) {\n    url += '&to=' + encodeURIComponent(to);\n  }\n\n  const data = await helpers.httpRequest({\n    method: 'GET',\n    url: url\n  });\n\n  if (to && data.rates && data.rates[to] !== undefined) {\n    const rate = data.rates[to] / amount;\n    return [{ json: {\n      result: amount + ' ' + from + ' = ' + data.rates[to] + ' ' + to + ' (rate: ' + rate.toFixed(6) + ', date: ' + data.date + ')'\n    } }];\n  }\n\n  // Return all available rates\n  const lines = [amount + ' ' + from + ' as of ' + data.date + ':'];\n  for (const [currency, value] of Object.entries(data.rates)) {\n    lines.push('  ' + currency + ': ' + value);\n  }\n\n  return [{ json: {\n    result: lines.join('\\n'),\n    rates: data.rates,\n    date: data.date\n  } }];\n} catch (e) {\n  return [{ json: { error: 'Exchange rate API error: ' + e.message } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Convert Currency", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Exchange Rates",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "exchange-rates"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "convert_currency",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "convert_currency",
+          "description": "Convert currencies using live exchange rates. Parameters: from (source currency code, default EUR), to (target currency code, default USD), amount (amount to convert, default 1)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "from": "={{ $fromAI('from', 'Source currency code, default EUR', 'string') }}",
+              "to": "={{ $fromAI('to', 'Target currency code, default USD', 'string') }}",
+              "amount": "={{ $fromAI('amount', 'Amount to convert, default 1', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "from",
+                "displayName": "from",
+                "type": "string",
+                "description": "Source currency code, default EUR",
+                "required": false
+              },
+              {
+                "id": "to",
+                "displayName": "to",
+                "type": "string",
+                "description": "Target currency code, default USD",
+                "required": false
+              },
+              {
+                "id": "amount",
+                "displayName": "amount",
+                "type": "string",
+                "description": "Amount to convert, default 1",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "convert_currency": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

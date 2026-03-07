@@ -1,0 +1,95 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: IP Geolocation",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Geolocate IP",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst ip = input.ip || '8.8.8.8';\n\nconst data = await helpers.httpRequest({\n  method: 'GET',\n  url: 'http://ip-api.com/json/' + encodeURIComponent(ip) + '?fields=status,message,country,regionName,city,zip,lat,lon,timezone,isp,org,as,query'\n});\n\nif (data.status === 'fail') {\n  return [{ json: { error: 'Lookup failed for ' + ip + ': ' + (data.message || 'unknown error') } }];\n}\n\nlet r = 'IP: ' + data.query + '\\n';\nr += 'Country: ' + data.country + '\\n';\nr += 'Region: ' + data.regionName + '\\n';\nr += 'City: ' + data.city + '\\n';\nr += 'ZIP: ' + data.zip + '\\n';\nr += 'Lat/Lon: ' + data.lat + ', ' + data.lon + '\\n';\nr += 'Timezone: ' + data.timezone + '\\n';\nr += 'ISP: ' + data.isp + '\\n';\nr += 'Org: ' + data.org + '\\n';\nr += 'AS: ' + data.as;\n\nreturn [{ json: { result: r } }];"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Geolocate IP", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: IP Geolocation",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "ip-geolocation"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "geolocate_ip",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "geolocate_ip",
+          "description": "Get location, ISP, and organization info for an IP address. Parameter: ip (IP address to look up)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "ip": "={{ $fromAI('ip', 'IP address to look up', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "ip",
+                "displayName": "ip",
+                "type": "string",
+                "description": "IP address to look up",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "geolocate_ip": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

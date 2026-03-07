@@ -1,0 +1,19 @@
+{
+  "id": "hackernews",
+  "name": "Hacker News",
+  "version": "1.0.0",
+  "type": "native",
+  "category": "news",
+  "description": "Search Hacker News stories and get top stories",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "search_hackernews",
+      "description": "Search Hacker News stories or get top stories"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}
