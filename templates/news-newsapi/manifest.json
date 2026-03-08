@@ -1,0 +1,26 @@
+{
+  "id": "news-newsapi",
+  "name": "News (NewsAPI)",
+  "version": "1.0.0",
+  "updated": "2026-03-08",
+  "type": "native",
+  "category": "news",
+  "description": "Search news articles and get top headlines from 80,000+ sources (NewsAPI, free key required)",
+  "credentials_required": [
+    {
+      "key": "newsapi_key",
+      "label": "NewsAPI Key",
+      "hint": "Free key at newsapi.org/register — sign up, copy key from your dashboard"
+    }
+  ],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "search_news",
+      "description": "Search news articles by keyword, with optional language and sort filters"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

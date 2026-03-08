@@ -1,0 +1,111 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: News NewsAPI",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Search News",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst query = input.query;\nif (!query) return [{ json: { error: 'Parameter \"query\" is required.' } }];\n\nconst language = input.language || 'en';\nconst sortBy = input.sort_by || 'publishedAt';\n\n// Fetch API key from template_credentials\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.news-newsapi&cred_key=eq.newsapi_key&select=cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0 || !creds[0].cred_value) {\n  return [{ json: { error: 'NewsAPI key not configured. Use add_credential to set it up.' } }];\n}\n\nconst apiKey = creds[0].cred_value;\n\nconst data = await helpers.httpRequest({\n  method: 'GET',\n  url: 'https://newsapi.org/v2/everything?q=' + encodeURIComponent(query)\n    + '&language=' + language + '&sortBy=' + sortBy + '&pageSize=5',\n  headers: { 'X-Api-Key': apiKey }\n});\n\nif (data.status !== 'ok') {\n  return [{ json: { error: data.message || 'NewsAPI request failed.' } }];\n}\n\nlet result = 'News for \"' + query + '\" (' + data.totalResults + ' total):\\n\\n';\nfor (const a of (data.articles || [])) {\n  result += '- ' + a.title + '\\n';\n  result += '  ' + (a.description || '').substring(0, 150) + '\\n';\n  result += '  Source: ' + a.source.name + ' | ' + a.publishedAt.split('T')[0] + '\\n';\n  result += '  ' + a.url + '\\n\\n';\n}\n\nreturn [{ json: { result } }];"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Search News", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: News NewsAPI",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "news-newsapi"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "search_news",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "search_news",
+          "description": "Search news articles by keyword. Parameters: query (search keywords, required), language (ISO code like 'en', 'de', optional), sort_by ('publishedAt', 'relevancy', or 'popularity', optional)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "query": "={{ $fromAI('query', 'Search keywords for news articles', 'string') }}",
+              "language": "={{ $fromAI('language', 'ISO language code (default: en)', 'string') }}",
+              "sort_by": "={{ $fromAI('sort_by', 'Sort order: publishedAt, relevancy, or popularity (default: publishedAt)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "Search keywords for news articles",
+                "required": true
+              },
+              {
+                "id": "language",
+                "displayName": "language",
+                "type": "string",
+                "description": "ISO language code (default: en)",
+                "required": false
+              },
+              {
+                "id": "sort_by",
+                "displayName": "sort_by",
+                "type": "string",
+                "description": "Sort order: publishedAt, relevancy, or popularity (default: publishedAt)",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "search_news": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

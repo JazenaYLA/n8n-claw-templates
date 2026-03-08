@@ -64,6 +64,20 @@
       "description": "Comprehensive website health check: load time benchmark, security headers, meta tags, structured data, and more",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "news-newsapi",
+      "name": "News (NewsAPI)",
+      "type": "native",
+      "category": "news",
+      "description": "Search news articles and get top headlines from 80,000+ sources (NewsAPI, free key required)",
+      "credentials_required": [
+        {
+          "key": "newsapi_key",
+          "label": "NewsAPI Key"
+        }
+      ],
+      "version": "1.0.0"
     }
   ]
 }
