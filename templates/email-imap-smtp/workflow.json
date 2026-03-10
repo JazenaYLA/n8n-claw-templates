@@ -1,0 +1,188 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Email IMAP/SMTP",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Email Action",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action;\nif (!action) return [{ json: { error: 'Parameter \"action\" is required (read or send).' } }];\n\n// Fetch credentials from template_credentials\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.email-imap-smtp&select=cred_key,cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0) {\n  return [{ json: { error: 'Email credentials not configured. Use add_credential to set them up.' } }];\n}\n\nconst credMap = {};\nfor (const c of creds) credMap[c.cred_key] = c.cred_value;\n\nif (!credMap.email_user || !credMap.email_password) {\n  return [{ json: { error: 'email_user and email_password must be configured.' } }];\n}\n\nconst BRIDGE_URL = 'http://email-bridge:3100';\n\nif (action === 'read') {\n  if (!credMap.imap_host) {\n    return [{ json: { error: 'imap_host credential not configured.' } }];\n  }\n\n  const body = {\n    host: credMap.imap_host,\n    port: Number(credMap.imap_port || 993),\n    user: credMap.email_user,\n    password: credMap.email_password,\n    folder: input.folder || 'INBOX',\n    limit: Number(input.limit || 10)\n  };\n  if (input.since) body.since = input.since;\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: BRIDGE_URL + '/read-emails',\n      body,\n      headers: { 'Content-Type': 'application/json' }\n    });\n\n    if (data.error) return [{ json: { error: data.error } }];\n\n    let result = 'Emails (' + data.emails.length + ' of ' + data.total + ' total):\\n\\n';\n    for (const e of data.emails) {\n      result += '- **' + e.subject + '**\\n';\n      result += '  From: ' + e.from + ' | ' + (e.date ? e.date.split('T')[0] : '') + '\\n';\n      if (e.text) result += '  ' + e.text.substring(0, 300).replace(/\\n/g, ' ') + '\\n';\n      result += '\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to read emails: ' + err.message } }];\n  }\n\n} else if (action === 'send') {\n  if (!credMap.smtp_host) {\n    return [{ json: { error: 'smtp_host credential not configured.' } }];\n  }\n  if (!input.to || !input.subject) {\n    return [{ json: { error: 'Parameters \"to\" and \"subject\" are required for sending.' } }];\n  }\n\n  const body = {\n    host: credMap.smtp_host,\n    port: Number(credMap.smtp_port || 587),\n    user: credMap.email_user,\n    password: credMap.email_password,\n    to: input.to,\n    subject: input.subject,\n    body: input.body || ''\n  };\n  if (input.html) body.html = input.html;\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: BRIDGE_URL + '/send-email',\n      body,\n      headers: { 'Content-Type': 'application/json' }\n    });\n\n    if (data.error) return [{ json: { error: data.error } }];\n    return [{ json: { result: 'Email sent successfully to ' + input.to + ' (ID: ' + data.messageId + ')' } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to send email: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use \"read\" or \"send\".' } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Email Action", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Email IMAP/SMTP",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "email-imap-smtp"
+        }
+      },
+      {
+        "id": "tool-read",
+        "name": "read_emails",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "read_emails",
+          "description": "Read recent emails from inbox. Parameters: folder (mailbox folder, default INBOX), limit (max emails to return, default 10), since (date filter like '2026-03-01', optional)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "read",
+              "folder": "={{ $fromAI('folder', 'Mailbox folder (default: INBOX)', 'string') }}",
+              "limit": "={{ $fromAI('limit', 'Max number of emails to return (default: 10)', 'string') }}",
+              "since": "={{ $fromAI('since', 'Only fetch emails since this date (ISO format, optional)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type (always 'read' for this tool)",
+                "required": true
+              },
+              {
+                "id": "folder",
+                "displayName": "folder",
+                "type": "string",
+                "description": "Mailbox folder (default: INBOX)",
+                "required": false
+              },
+              {
+                "id": "limit",
+                "displayName": "limit",
+                "type": "string",
+                "description": "Max number of emails to return (default: 10)",
+                "required": false
+              },
+              {
+                "id": "since",
+                "displayName": "since",
+                "type": "string",
+                "description": "Only fetch emails since this date (ISO format, optional)",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-send",
+        "name": "send_email",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [300, 300],
+        "parameters": {
+          "name": "send_email",
+          "description": "Send an email. Parameters: to (recipient email, required), subject (email subject, required), body (plain text body, required), html (HTML body, optional)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "send",
+              "to": "={{ $fromAI('to', 'Recipient email address', 'string') }}",
+              "subject": "={{ $fromAI('subject', 'Email subject line', 'string') }}",
+              "body": "={{ $fromAI('body', 'Plain text email body', 'string') }}",
+              "html": "={{ $fromAI('html', 'Optional HTML email body', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type (always 'send' for this tool)",
+                "required": true
+              },
+              {
+                "id": "to",
+                "displayName": "to",
+                "type": "string",
+                "description": "Recipient email address",
+                "required": true
+              },
+              {
+                "id": "subject",
+                "displayName": "subject",
+                "type": "string",
+                "description": "Email subject line",
+                "required": true
+              },
+              {
+                "id": "body",
+                "displayName": "body",
+                "type": "string",
+                "description": "Plain text email body",
+                "required": true
+              },
+              {
+                "id": "html",
+                "displayName": "html",
+                "type": "string",
+                "description": "Optional HTML email body",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "read_emails": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "send_email": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

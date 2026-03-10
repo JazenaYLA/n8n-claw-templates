@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "updated": "2026-03-08",
+  "updated": "2026-03-10",
   "templates": [
     {
       "id": "weather-openmeteo",
@@ -76,6 +76,20 @@
           "key": "newsapi_key",
           "label": "NewsAPI Key"
         }
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "email-imap-smtp",
+      "name": "Email (IMAP/SMTP)",
+      "type": "native",
+      "category": "communication",
+      "description": "Read and send emails via IMAP/SMTP (requires email-bridge service and email account credentials)",
+      "credentials_required": [
+        { "key": "email_user", "label": "Email Address" },
+        { "key": "email_password", "label": "Email Password" },
+        { "key": "imap_host", "label": "IMAP Server" },
+        { "key": "smtp_host", "label": "SMTP Server" }
       ],
       "version": "1.0.0"
     }

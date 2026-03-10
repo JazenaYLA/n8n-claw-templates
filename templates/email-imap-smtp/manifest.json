@@ -1,0 +1,56 @@
+{
+  "id": "email-imap-smtp",
+  "name": "Email (IMAP/SMTP)",
+  "version": "1.0.0",
+  "updated": "2026-03-10",
+  "type": "native",
+  "category": "communication",
+  "description": "Read and send emails via IMAP/SMTP (requires email-bridge service and email account credentials)",
+  "credentials_required": [
+    {
+      "key": "email_user",
+      "label": "Email Address",
+      "hint": "Your email address, e.g. user@gmail.com"
+    },
+    {
+      "key": "email_password",
+      "label": "Email Password",
+      "hint": "App password recommended (Gmail: myaccount.google.com/apppasswords)"
+    },
+    {
+      "key": "imap_host",
+      "label": "IMAP Server",
+      "hint": "e.g. imap.gmail.com, imap.mail.yahoo.com, outlook.office365.com"
+    },
+    {
+      "key": "smtp_host",
+      "label": "SMTP Server",
+      "hint": "e.g. smtp.gmail.com, smtp.mail.yahoo.com, smtp.office365.com"
+    }
+  ],
+  "credentials_optional": [
+    {
+      "key": "imap_port",
+      "label": "IMAP Port",
+      "hint": "Default: 993 (SSL)"
+    },
+    {
+      "key": "smtp_port",
+      "label": "SMTP Port",
+      "hint": "Default: 587 (STARTTLS)"
+    }
+  ],
+  "tools": [
+    {
+      "name": "read_emails",
+      "description": "Read recent emails from inbox or a specific folder"
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to a recipient"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}
