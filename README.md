@@ -17,6 +17,7 @@ Template catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP 
 | [website-check](templates/website-check/) | network | Website health check: load time, security headers, meta tags, structured data | None |
 | [news-newsapi](templates/news-newsapi/) | news | Search news articles from 80,000+ sources | NewsAPI Key |
 | [email-imap-smtp](templates/email-imap-smtp/) | communication | Read and send emails via IMAP/SMTP | Email address, password, IMAP host, SMTP host |
+| [wiener-linien](templates/wiener-linien/) | transport | Plan routes with Vienna public transport (Wiener Linien), get your station ID from [this CSV File](https://data.wien.gv.at/csv/wienerlinien-ogd-haltestellen.csv) (yes, a CSV file, don't ask), more details can be found on the [Wiener Linien Routingservice Wien](https://www.data.gv.at/datasets/9c203fec-dc0d-412c-a7a3-7fd77d0346f1?locale=de) page | None |
 
 ---
 
