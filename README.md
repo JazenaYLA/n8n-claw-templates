@@ -4,20 +4,20 @@ Template catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP 
 
 ---
 
-## Available Templates
+## Available Skills
 
 | Template | Category | Description | Credentials | Author |
 |----------|----------|-------------|-------------|--------|
-| [weather-openmeteo](templates/weather-openmeteo/) | weather | Current weather and 3-day forecast for any city | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| [wikipedia](templates/wikipedia/) | knowledge | Search Wikipedia and get article summaries | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [email-imap-smtp](templates/email-imap-smtp/) | communication | Read and send emails via IMAP/SMTP | Email address, password, IMAP host, SMTP host | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [exchange-rates](templates/exchange-rates/) | finance | Convert currencies using live exchange rates | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| [hackernews](templates/hackernews/) | news | Search Hacker News stories and get top stories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [wikipedia](templates/wikipedia/) | knowledge | Search Wikipedia and get article summaries | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [dictionary](templates/dictionary/) | language | English word definitions, phonetics, and examples | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [ip-geolocation](templates/ip-geolocation/) | network | Get location, ISP, and org info for any IP address | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [website-check](templates/website-check/) | network | Website health check: load time, security headers, meta tags, structured data | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [hackernews](templates/hackernews/) | news | Search Hacker News stories and get top stories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [news-newsapi](templates/news-newsapi/) | news | Search news articles from 80,000+ sources | NewsAPI Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| [email-imap-smtp](templates/email-imap-smtp/) | communication | Read and send emails via IMAP/SMTP | Email address, password, IMAP host, SMTP host | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [wiener-linien](templates/wiener-linien/) | transport | Plan routes with Vienna public transport (Wiener Linien), get your station ID from [this CSV File](https://data.wien.gv.at/csv/wienerlinien-ogd-haltestellen.csv) (yes, a CSV file, don't ask), more details can be found on the [Wiener Linien Routingservice Wien](https://www.data.gv.at/datasets/9c203fec-dc0d-412c-a7a3-7fd77d0346f1?locale=de) page | None | [@lcx](https://github.com/lcx) |
+| [weather-openmeteo](templates/weather-openmeteo/) | weather | Current weather and 3-day forecast for any city | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ---
 
