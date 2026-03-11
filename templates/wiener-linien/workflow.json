@@ -1,0 +1,111 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Wiener Linien",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Create Route",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst destinationAddress = input.destination_address || '';\nconst arrivalTime = input.arrival_time || '';\nconst startStationId = input.start_station_id || '';\n\nif (!destinationAddress) {\n  return [{ json: { error: 'No destination address provided' } }];\n}\n\nif (!arrivalTime) {\n  return [{ json: { error: 'No arrival time provided' } }];\n}\n\n// Step 1: Convert address to coordinates using Vienna OGD Address Service\nlet coordinates;\ntry {\n  const geoData = await helpers.httpRequest({\n    method: 'GET',\n    url: 'https://data.wien.gv.at/daten/OGDAddressService.svc/GetAddressInfo?Address=' + encodeURIComponent(destinationAddress) + '&crs=EPSG:4326'\n  });\nconsole.log(geoData);\n  if (!geoData.features || geoData.features.length === 0) {\n    return [{ json: { error: 'Could not find coordinates for address: ' + destinationAddress } }];\n  }\n\n  coordinates = geoData.features[0].geometry.coordinates;\n  console.log(coordinates)\n} catch (e) {\n  return [{ json: { error: 'Address lookup failed: ' + e.message } }];\n}\n\n// Step 2: Request trip from Wiener Linien routing API\nlet tripData;\nlet time = arrivalTime;\nif (time.includes('T')) {\n  time = time.split('T')[1].substring(0, 5);\n}\ntry {\nconst params = 'type_origin=stopID'\n  + '&name_origin=' + encodeURIComponent(startStationId)\n  + '&type_destination=coord'\n  + '&name_destination=' + encodeURIComponent(coordinates[0] + ':' + coordinates[1] + ':WGS84[DD.ddddd]')\n  + '&outputFormat=JSON'\n  + '&itdTripDateTimeDepArr=arr'\n  + '&itdTime=' + encodeURIComponent(time);\nconsole.log(params)\n  tripData = await helpers.httpRequest({\n    method: 'GET',\n    url: 'https://www.wienerlinien.at/ogd_routing/XML_TRIP_REQUEST2?' + params.toString()\n  });\n} catch (e) {\n  return [{ json: { error: 'Wiener Linien routing API error: ' + e.message } }];\n}\n\n// Step 3: Extract and sort trips by duration\nconst trips = tripData.trips || [];\nif (trips.length === 0) {\n  return [{ json: { error: 'No routes found for this trip' } }];\n}\n\ntrips.sort((a, b) => {\n  const durationA = parseInt(a.duration) || 9999;\n  const durationB = parseInt(b.duration) || 9999;\n  return durationA - durationB;\n});\n\n// Step 4: Return the best trip (shortest duration)\nconst best = trips[0];\nreturn [{ json: {\n  duration: best.duration,\n  line_changes: best.interchange,\n  total_trips_found: trips.length\n} }];"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Create Route", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Wiener Linien",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "wiener-linien"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "create_route_public_transport_vienna",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "create_route_public_transport_vienna",
+          "description": "Create a routing plan with the Vienna public transport system. Provide a destination address (street and house number, no zip code, no city) and the arrival time (when the user should arrive). Parameters: destination_address (street and house number), arrival_time (time in HH:MM:SS format), start_station_id (optional, defaults to Gasometer)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "destination_address": "={{ $fromAI('destination_address', 'Destination street and house number (no zip code, no city)', 'string') }}",
+              "arrival_time": "={{ $fromAI('arrival_time', 'Desired arrival time in HH:MM:SS format', 'string') }}",
+              "start_station_id": "={{ $fromAI('start_station_id', 'Start station ID', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "destination_address",
+                "displayName": "destination_address",
+                "type": "string",
+                "description": "Destination street and house number (no zip code, no city)",
+                "required": true
+              },
+              {
+                "id": "arrival_time",
+                "displayName": "arrival_time",
+                "type": "string",
+                "description": "Desired arrival time in HH:MM:SS format",
+                "required": true
+              },
+              {
+                "id": "start_station_id",
+                "displayName": "start_station_id",
+                "type": "string",
+                "description": "Start station ID",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "create_route_public_transport_vienna": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

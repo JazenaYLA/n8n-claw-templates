@@ -92,6 +92,15 @@
         { "key": "smtp_host", "label": "SMTP Server" }
       ],
       "version": "1.0.0"
+    },
+    {
+      "id": "wiener-linien",
+      "name": "Wiener Linien",
+      "type": "native",
+      "category": "transport",
+      "description": "Plan routes with Vienna public transport (Wiener Linien). Provide a destination address and arrival time to get the best route.",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }

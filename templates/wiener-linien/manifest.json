@@ -1,0 +1,20 @@
+{
+  "id": "wiener-linien",
+  "name": "Wiener Linien",
+  "version": "1.0.0",
+  "updated": "2026-03-10",
+  "type": "native",
+  "category": "transport",
+  "description": "Plan routes with Vienna public transport (Wiener Linien). Provide a destination address and arrival time to get the best route.",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "create_route_public_transport_vienna",
+      "description": "Create a routing plan with the Vienna public transport system"
+    }
+  ],
+  "author": "lcx",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}
