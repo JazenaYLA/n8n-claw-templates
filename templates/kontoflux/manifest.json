@@ -1,0 +1,47 @@
+{
+  "id": "kontoflux",
+  "name": "KontoFlux",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "finance",
+  "description": "Access German bank accounts and transactions via KontoFlux Open-Banking API (5000+ banks, read-only)",
+  "credentials_required": [
+    {
+      "key": "kontoflux_api_key",
+      "label": "KontoFlux API Key",
+      "hint": "Get your API key from kontoflux.io workspace settings"
+    },
+    {
+      "key": "kontoflux_workspace_id",
+      "label": "KontoFlux Workspace ID",
+      "hint": "Your workspace ID from kontoflux.io"
+    }
+  ],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "list_accounts",
+      "description": "List all bank accounts in your KontoFlux workspace"
+    },
+    {
+      "name": "get_transactions",
+      "description": "Get transactions with optional date and category filters"
+    },
+    {
+      "name": "search_transactions",
+      "description": "Full-text search across all transactions"
+    },
+    {
+      "name": "list_categories",
+      "description": "List all AI-generated transaction categories"
+    },
+    {
+      "name": "check_scope",
+      "description": "Check API key permissions and access scope"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

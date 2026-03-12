@@ -26,6 +26,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 |-------|-------------|-------------|--------|
 | [crypto-prices](templates/crypto-prices/) | Get cryptocurrency prices, market cap, and 24h changes | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [exchange-rates](templates/exchange-rates/) | Convert currencies using live exchange rates | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [kontoflux](templates/kontoflux/) | Access German bank accounts and transactions via KontoFlux Open-Banking API (5000+ banks, read-only) | KontoFlux API Key, Workspace ID | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ### Knowledge
 
