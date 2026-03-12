@@ -101,6 +101,15 @@
       "description": "Plan routes with Vienna public transport (Wiener Linien). Provide a destination address and arrival time to get the best route.",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "qr-code",
+      "name": "QR Code Generator",
+      "type": "native",
+      "category": "utilities",
+      "description": "Generate QR codes from text or URLs (goqr.me API, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }

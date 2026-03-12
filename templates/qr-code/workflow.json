@@ -1,0 +1,103 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: QR Code",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Generate QR Code",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst data = input.data;\nif (!data) return [{ json: { error: 'Parameter \"data\" is required (text or URL to encode).' } }];\n\nconst size = input.size || '300x300';\nconst encoded = encodeURIComponent(data);\nconst url = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + '&data=' + encoded + '&format=png';\n\n// Verify the API is reachable\ntry {\n  const response = await helpers.httpRequest({\n    method: 'GET',\n    url: url,\n    returnFullResponse: true,\n    encoding: 'arraybuffer',\n    timeout: 10000\n  });\n\n  if (response.statusCode !== 200) {\n    return [{ json: { error: 'QR code generation failed (HTTP ' + response.statusCode + ')' } }];\n  }\n} catch (err) {\n  return [{ json: { error: 'QR code API unreachable: ' + err.message } }];\n}\n\nlet result = 'QR Code generated!\\n';\nresult += 'Image URL: ' + url + '\\n';\nresult += 'Content: ' + data + '\\n';\nresult += 'Size: ' + size + ' pixels';\n\nreturn [{ json: { result } }];"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Generate QR Code", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: QR Code",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "qr-code"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "generate_qr_code",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "generate_qr_code",
+          "description": "Generate a QR code image from text or a URL. Returns an image URL that can be shared. Parameters: data (text or URL to encode into QR code), size (optional, image dimensions like '300x300', default '300x300')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "data": "={{ $fromAI('data', 'Text or URL to encode into a QR code', 'string') }}",
+              "size": "={{ $fromAI('size', 'Image size in pixels (e.g. 300x300). Optional, default 300x300', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "data",
+                "displayName": "data",
+                "type": "string",
+                "description": "Text or URL to encode into a QR code",
+                "required": true
+              },
+              {
+                "id": "size",
+                "displayName": "size",
+                "type": "string",
+                "description": "Image size in pixels (e.g. 300x300). Optional, default 300x300",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "generate_qr_code": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}
