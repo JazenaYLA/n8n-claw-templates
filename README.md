@@ -36,6 +36,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 
 | Skill | Description | Credentials | Author |
 |-------|-------------|-------------|--------|
+| [deepl-translate](templates/deepl-translate/) | Translate text between 30+ languages and detect languages | DeepL API Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [dictionary](templates/dictionary/) | English word definitions, phonetics, and examples | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ### Meetings

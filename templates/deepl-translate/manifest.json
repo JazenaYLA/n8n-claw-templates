@@ -1,0 +1,30 @@
+{
+  "id": "deepl-translate",
+  "name": "DeepL Translate",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "language",
+  "description": "Translate text between 30+ languages and detect languages using the DeepL API",
+  "credentials_required": [
+    {
+      "key": "deepl_api_key",
+      "label": "DeepL API Key",
+      "hint": "Free at deepl.com/pro-api — 500K chars/month"
+    }
+  ],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "translate_text",
+      "description": "Translate text to a target language using DeepL"
+    },
+    {
+      "name": "detect_language",
+      "description": "Detect the language of a given text"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

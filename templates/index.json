@@ -166,6 +166,20 @@
       "version": "1.0.0"
     },
     {
+      "id": "deepl-translate",
+      "name": "DeepL Translate",
+      "type": "native",
+      "category": "language",
+      "description": "Translate text between 30+ languages and detect languages using the DeepL API",
+      "credentials_required": [
+        {
+          "key": "deepl_api_key",
+          "label": "DeepL API Key"
+        }
+      ],
+      "version": "1.0.0"
+    },
+    {
       "id": "vexa-meetings",
       "name": "Vexa Meetings",
       "type": "native",

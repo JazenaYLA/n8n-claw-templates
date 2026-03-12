@@ -1,0 +1,164 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: DeepL Translate",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "DeepL Logic",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'translate_text';\n\n// Fetch API key from template_credentials\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.deepl-translate&cred_key=eq.deepl_api_key&select=cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0 || !creds[0].cred_value) {\n  return [{ json: { error: 'DeepL API key not configured. Use add_credential to set it up.' } }];\n}\n\nconst apiKey = creds[0].cred_value;\nconst baseUrl = apiKey.endsWith(':fx') ? 'https://api-free.deepl.com' : 'https://api.deepl.com';\n\nif (action === 'translate_text') {\n  const text = input.text;\n  if (!text) {\n    return [{ json: { error: 'Parameter \"text\" is required.' } }];\n  }\n  const targetLang = (input.target_lang || 'EN').toUpperCase();\n  const sourceLang = input.source_lang ? input.source_lang.toUpperCase() : undefined;\n\n  try {\n    const body = {\n      text: [text],\n      target_lang: targetLang\n    };\n    if (sourceLang) body.source_lang = sourceLang;\n\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: baseUrl + '/v2/translate',\n      headers: {\n        'Authorization': 'DeepL-Auth-Key ' + apiKey,\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify(body)\n    });\n\n    const parsed = typeof data === 'string' ? JSON.parse(data) : data;\n\n    if (!parsed.translations || parsed.translations.length === 0) {\n      return [{ json: { error: 'No translation returned.' } }];\n    }\n\n    const t = parsed.translations[0];\n    let result = 'Translation (' + t.detected_source_language + ' -> ' + targetLang + '):\\n\\n';\n    result += t.text;\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'DeepL translation failed: ' + err.message } }];\n  }\n\n} else if (action === 'detect_language') {\n  const text = input.text;\n  if (!text) {\n    return [{ json: { error: 'Parameter \"text\" is required.' } }];\n  }\n\n  try {\n    // Translate to EN just to get detected_source_language\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: baseUrl + '/v2/translate',\n      headers: {\n        'Authorization': 'DeepL-Auth-Key ' + apiKey,\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({\n        text: [text.substring(0, 200)],\n        target_lang: 'EN'\n      })\n    });\n\n    const parsed = typeof data === 'string' ? JSON.parse(data) : data;\n\n    if (!parsed.translations || parsed.translations.length === 0) {\n      return [{ json: { error: 'Could not detect language.' } }];\n    }\n\n    const langCode = parsed.translations[0].detected_source_language;\n\n    const langNames = {\n      'BG': 'Bulgarian', 'CS': 'Czech', 'DA': 'Danish', 'DE': 'German',\n      'EL': 'Greek', 'EN': 'English', 'ES': 'Spanish', 'ET': 'Estonian',\n      'FI': 'Finnish', 'FR': 'French', 'HU': 'Hungarian', 'ID': 'Indonesian',\n      'IT': 'Italian', 'JA': 'Japanese', 'KO': 'Korean', 'LT': 'Lithuanian',\n      'LV': 'Latvian', 'NB': 'Norwegian', 'NL': 'Dutch', 'PL': 'Polish',\n      'PT': 'Portuguese', 'RO': 'Romanian', 'RU': 'Russian', 'SK': 'Slovak',\n      'SL': 'Slovenian', 'SV': 'Swedish', 'TR': 'Turkish', 'UK': 'Ukrainian',\n      'ZH': 'Chinese', 'AR': 'Arabic'\n    };\n\n    const langName = langNames[langCode] || langCode;\n    return [{ json: { result: 'Detected language: ' + langName + ' (' + langCode + ')' } }];\n  } catch (err) {\n    return [{ json: { error: 'Language detection failed: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use translate_text or detect_language.' } }];\n}\n"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "DeepL Logic", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: DeepL Translate",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "deepl-translate"
+        }
+      },
+      {
+        "id": "tool-translate",
+        "name": "translate_text",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "translate_text",
+          "description": "Translate text to a target language using DeepL. Parameters: text (the text to translate, required), target_lang (target language code like 'DE', 'EN', 'FR', 'ES', 'IT', 'JA', 'ZH', required), source_lang (source language code, optional — auto-detected if omitted)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "translate_text",
+              "text": "={{ $fromAI('text', 'The text to translate', 'string') }}",
+              "target_lang": "={{ $fromAI('target_lang', 'Target language code (e.g. DE, EN, FR, ES, IT, JA, ZH)', 'string') }}",
+              "source_lang": "={{ $fromAI('source_lang', 'Source language code (optional, auto-detected if omitted)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "text",
+                "displayName": "text",
+                "type": "string",
+                "description": "The text to translate",
+                "required": true
+              },
+              {
+                "id": "target_lang",
+                "displayName": "target_lang",
+                "type": "string",
+                "description": "Target language code (e.g. DE, EN, FR)",
+                "required": true
+              },
+              {
+                "id": "source_lang",
+                "displayName": "source_lang",
+                "type": "string",
+                "description": "Source language code (optional)",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-detect",
+        "name": "detect_language",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 300],
+        "parameters": {
+          "name": "detect_language",
+          "description": "Detect the language of a given text using DeepL. Parameter: text (the text to analyze, required)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "detect_language",
+              "text": "={{ $fromAI('text', 'The text to detect the language of', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "text",
+                "displayName": "text",
+                "type": "string",
+                "description": "The text to detect the language of",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "translate_text": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "detect_language": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}
