@@ -128,6 +128,15 @@
       "description": "Look up public holidays for any country (Nager.Date API, free)",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "crypto-prices",
+      "name": "Crypto Prices",
+      "type": "native",
+      "category": "finance",
+      "description": "Get cryptocurrency prices, market cap, and 24h changes (CoinGecko API, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }
