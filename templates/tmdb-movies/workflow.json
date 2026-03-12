@@ -1,0 +1,209 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: TMDB Movies & TV",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "TMDB Logic",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'search_movie';\n\n// Fetch API key from template_credentials\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.tmdb-movies&cred_key=eq.tmdb_api_key&select=cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0 || !creds[0].cred_value) {\n  return [{ json: { error: 'TMDB API key not configured. Use add_credential to set it up.' } }];\n}\n\nconst apiKey = creds[0].cred_value;\nconst authHeaders = {\n  'Authorization': 'Bearer ' + apiKey,\n  'Accept': 'application/json'\n};\n\nfunction formatRating(vote, count) {\n  if (!vote || vote === 0) return 'No ratings yet';\n  return vote.toFixed(1) + '/10 (' + count + ' votes)';\n}\n\nif (action === 'search_movie') {\n  const query = input.query;\n  if (!query) return [{ json: { error: 'Parameter \"query\" is required (movie title).' } }];\n  const year = input.year || '';\n\n  try {\n    let url = 'https://api.themoviedb.org/3/search/movie?query=' + encodeURIComponent(query) + '&language=en-US&page=1';\n    if (year) url += '&year=' + year;\n\n    const data = await helpers.httpRequest({ method: 'GET', url, headers: authHeaders });\n\n    if (!data.results || data.results.length === 0) {\n      return [{ json: { error: 'No movies found for \"' + query + '\".' } }];\n    }\n\n    let result = 'Movies matching \"' + query + '\" (' + data.total_results + ' total):\\n\\n';\n    const movies = data.results.slice(0, 5);\n    for (const m of movies) {\n      result += '**' + m.title + '**';\n      if (m.release_date) result += ' (' + m.release_date.substring(0, 4) + ')';\n      result += '\\n';\n      result += 'Rating: ' + formatRating(m.vote_average, m.vote_count) + '\\n';\n      if (m.overview) result += m.overview.substring(0, 200) + (m.overview.length > 200 ? '...' : '') + '\\n';\n      result += '\\n';\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'TMDB search failed: ' + err.message } }];\n  }\n\n} else if (action === 'search_tv') {\n  const query = input.query;\n  if (!query) return [{ json: { error: 'Parameter \"query\" is required (TV show title).' } }];\n\n  try {\n    const url = 'https://api.themoviedb.org/3/search/tv?query=' + encodeURIComponent(query) + '&language=en-US&page=1';\n    const data = await helpers.httpRequest({ method: 'GET', url, headers: authHeaders });\n\n    if (!data.results || data.results.length === 0) {\n      return [{ json: { error: 'No TV shows found for \"' + query + '\".' } }];\n    }\n\n    let result = 'TV shows matching \"' + query + '\" (' + data.total_results + ' total):\\n\\n';\n    const shows = data.results.slice(0, 5);\n    for (const s of shows) {\n      result += '**' + s.name + '**';\n      if (s.first_air_date) result += ' (' + s.first_air_date.substring(0, 4) + ')';\n      result += '\\n';\n      result += 'Rating: ' + formatRating(s.vote_average, s.vote_count) + '\\n';\n      if (s.overview) result += s.overview.substring(0, 200) + (s.overview.length > 200 ? '...' : '') + '\\n';\n      result += '\\n';\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'TMDB TV search failed: ' + err.message } }];\n  }\n\n} else if (action === 'get_trending') {\n  const mediaType = input.media_type || 'all';\n  const timeWindow = input.time_window || 'week';\n\n  try {\n    const url = 'https://api.themoviedb.org/3/trending/' + mediaType + '/' + timeWindow + '?language=en-US';\n    const data = await helpers.httpRequest({ method: 'GET', url, headers: authHeaders });\n\n    if (!data.results || data.results.length === 0) {\n      return [{ json: { error: 'No trending results found.' } }];\n    }\n\n    let result = 'Trending ' + mediaType + ' this ' + timeWindow + ':\\n\\n';\n    const items = data.results.slice(0, 10);\n    for (const item of items) {\n      const title = item.title || item.name;\n      const date = item.release_date || item.first_air_date || '';\n      const type = item.media_type === 'movie' ? 'Movie' : item.media_type === 'tv' ? 'TV' : '';\n      result += '- **' + title + '**';\n      if (date) result += ' (' + date.substring(0, 4) + ')';\n      if (type) result += ' [' + type + ']';\n      result += ' — ' + formatRating(item.vote_average, item.vote_count) + '\\n';\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'TMDB trending failed: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use search_movie, search_tv, or get_trending.' } }];\n}\n"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "TMDB Logic", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: TMDB Movies & TV",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "tmdb-movies"
+        }
+      },
+      {
+        "id": "tool-search-movie",
+        "name": "search_movie",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "search_movie",
+          "description": "Search for movies by title. Parameters: query (movie title, required), year (release year to filter, optional)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "search_movie",
+              "query": "={{ $fromAI('query', 'Movie title to search for', 'string') }}",
+              "year": "={{ $fromAI('year', 'Release year to filter (optional)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "Movie title to search for",
+                "required": true
+              },
+              {
+                "id": "year",
+                "displayName": "year",
+                "type": "string",
+                "description": "Release year to filter (optional)",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-search-tv",
+        "name": "search_tv",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 300],
+        "parameters": {
+          "name": "search_tv",
+          "description": "Search for TV shows by title. Parameter: query (TV show title, required)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "search_tv",
+              "query": "={{ $fromAI('query', 'TV show title to search for', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "TV show title to search for",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-trending",
+        "name": "get_trending",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [500, 300],
+        "parameters": {
+          "name": "get_trending",
+          "description": "Get trending movies and TV shows. Parameters: media_type ('movie', 'tv', or 'all', optional, default 'all'), time_window ('day' or 'week', optional, default 'week')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "get_trending",
+              "media_type": "={{ $fromAI('media_type', 'Type: movie, tv, or all (default: all)', 'string') }}",
+              "time_window": "={{ $fromAI('time_window', 'Time window: day or week (default: week)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "media_type",
+                "displayName": "media_type",
+                "type": "string",
+                "description": "Type: movie, tv, or all (default: all)",
+                "required": false
+              },
+              {
+                "id": "time_window",
+                "displayName": "time_window",
+                "type": "string",
+                "description": "Time window: day or week (default: week)",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "search_movie": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "search_tv": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "get_trending": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "tmdb-movies",
+  "name": "TMDB Movies & TV",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "entertainment",
+  "description": "Search movies and TV shows, get details, and discover trending titles using The Movie Database (TMDB)",
+  "credentials_required": [
+    {
+      "key": "tmdb_api_key",
+      "label": "TMDB API Key (Bearer Token)",
+      "hint": "Free at themoviedb.org/settings/api — use the 'API Read Access Token' (starts with 'ey...')"
+    }
+  ],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "search_movie",
+      "description": "Search for movies by title"
+    },
+    {
+      "name": "search_tv",
+      "description": "Search for TV shows by title"
+    },
+    {
+      "name": "get_trending",
+      "description": "Get trending movies and TV shows"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

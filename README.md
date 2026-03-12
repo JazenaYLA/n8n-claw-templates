@@ -17,6 +17,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 | Skill | Description | Credentials | Author |
 |-------|-------------|-------------|--------|
 | [recipes](templates/recipes/) | Search recipes or get a random recipe with ingredients and instructions | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [tmdb-movies](templates/tmdb-movies/) | Search movies and TV shows, discover trending titles | TMDB API Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [trivia](templates/trivia/) | Random trivia questions with answers from various categories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ### Finance

@@ -166,6 +166,20 @@
       "version": "1.0.0"
     },
     {
+      "id": "tmdb-movies",
+      "name": "TMDB Movies & TV",
+      "type": "native",
+      "category": "entertainment",
+      "description": "Search movies and TV shows, get details, and discover trending titles (TMDB API)",
+      "credentials_required": [
+        {
+          "key": "tmdb_api_key",
+          "label": "TMDB API Key"
+        }
+      ],
+      "version": "1.0.0"
+    },
+    {
       "id": "deepl-translate",
       "name": "DeepL Translate",
       "type": "native",
