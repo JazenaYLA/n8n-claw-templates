@@ -57,7 +57,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 
 | Skill | Description | Credentials | Author |
 |-------|-------------|-------------|--------|
-| [github-api](templates/github-api/) | Search repos, get repo info, list and create issues | GitHub PAT | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [github-api](templates/github-api/) | Full GitHub integration: repos, issues, PRs, code search, file content, releases, notifications | GitHub PAT | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ### News
 

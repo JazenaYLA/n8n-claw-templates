@@ -25,7 +25,7 @@
         "typeVersion": 2,
         "position": [256, 0],
         "parameters": {
-          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'search_repos';\n\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.github-api&cred_key=eq.github_pat&select=cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0 || !creds[0].cred_value) {\n  return [{ json: { error: 'GitHub PAT not configured. Use add_credential to set it up.' } }];\n}\n\nconst token = creds[0].cred_value;\nconst ghHeaders = {\n  'Authorization': 'Bearer ' + token,\n  'Accept': 'application/vnd.github+json',\n  'X-GitHub-Api-Version': '2022-11-28'\n};\n\nfunction formatNumber(n) {\n  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';\n  return String(n);\n}\n\nif (action === 'search_repos') {\n  const query = input.query;\n  if (!query) return [{ json: { error: 'Parameter \"query\" is required.' } }];\n  const sort = input.sort || 'stars';\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/search/repositories?q=' + encodeURIComponent(query) + '&sort=' + sort + '&per_page=5',\n      headers: ghHeaders\n    });\n\n    if (!data.items || data.items.length === 0) {\n      return [{ json: { error: 'No repositories found for \"' + query + '\".' } }];\n    }\n\n    let result = 'GitHub repos for \"' + query + '\" (' + data.total_count + ' total):\\n\\n';\n    for (const r of data.items) {\n      result += '**' + r.full_name + '**';\n      result += ' — ' + formatNumber(r.stargazers_count) + ' stars, ' + formatNumber(r.forks_count) + ' forks\\n';\n      if (r.description) result += r.description.substring(0, 150) + '\\n';\n      if (r.language) result += 'Language: ' + r.language + '\\n';\n      result += r.html_url + '\\n\\n';\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'GitHub search failed: ' + err.message } }];\n  }\n\n} else if (action === 'get_repo_info') {\n  const owner = input.owner;\n  const repo = input.repo;\n  if (!owner || !repo) return [{ json: { error: 'Parameters \"owner\" and \"repo\" are required.' } }];\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo),\n      headers: ghHeaders\n    });\n\n    let result = '**' + data.full_name + '**\\n';\n    if (data.description) result += data.description + '\\n';\n    result += '\\n';\n    result += 'Stars: ' + formatNumber(data.stargazers_count) + '\\n';\n    result += 'Forks: ' + formatNumber(data.forks_count) + '\\n';\n    result += 'Open Issues: ' + data.open_issues_count + '\\n';\n    if (data.language) result += 'Language: ' + data.language + '\\n';\n    if (data.license && data.license.spdx_id) result += 'License: ' + data.license.spdx_id + '\\n';\n    result += 'Created: ' + data.created_at.split('T')[0] + '\\n';\n    result += 'Last Push: ' + data.pushed_at.split('T')[0] + '\\n';\n    if (data.topics && data.topics.length > 0) result += 'Topics: ' + data.topics.join(', ') + '\\n';\n    result += 'URL: ' + data.html_url + '\\n';\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to get repo info: ' + err.message } }];\n  }\n\n} else if (action === 'list_issues') {\n  const owner = input.owner;\n  const repo = input.repo;\n  if (!owner || !repo) return [{ json: { error: 'Parameters \"owner\" and \"repo\" are required.' } }];\n  const state = input.state || 'open';\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/issues?state=' + state + '&per_page=10',\n      headers: ghHeaders\n    });\n\n    if (!data || data.length === 0) {\n      return [{ json: { result: 'No ' + state + ' issues found in ' + owner + '/' + repo + '.' } }];\n    }\n\n    // Filter out PRs (GitHub API returns PRs as issues too)\n    const issues = data.filter(i => !i.pull_request);\n\n    if (issues.length === 0) {\n      return [{ json: { result: 'No ' + state + ' issues found in ' + owner + '/' + repo + ' (only pull requests).' } }];\n    }\n\n    let result = state.charAt(0).toUpperCase() + state.slice(1) + ' issues in ' + owner + '/' + repo + ':\\n\\n';\n    for (const i of issues) {\n      result += '#' + i.number + ' — **' + i.title + '**\\n';\n      if (i.labels && i.labels.length > 0) result += '  Labels: ' + i.labels.map(l => l.name).join(', ') + '\\n';\n      result += '  Created: ' + i.created_at.split('T')[0];\n      if (i.assignee) result += ' | Assignee: ' + i.assignee.login;\n      result += '\\n\\n';\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list issues: ' + err.message } }];\n  }\n\n} else if (action === 'create_issue') {\n  const owner = input.owner;\n  const repo = input.repo;\n  const title = input.title;\n  if (!owner || !repo || !title) return [{ json: { error: 'Parameters \"owner\", \"repo\", and \"title\" are required.' } }];\n\n  try {\n    const body = { title };\n    if (input.body) body.body = input.body;\n    if (input.labels) body.labels = input.labels.split(',').map(l => l.trim());\n\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/issues',\n      headers: { ...ghHeaders, 'Content-Type': 'application/json' },\n      body: JSON.stringify(body)\n    });\n\n    return [{ json: { result: 'Issue created: #' + data.number + ' — ' + data.title + '\\n' + data.html_url } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to create issue: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use search_repos, get_repo_info, list_issues, or create_issue.' } }];\n}\n"
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'search_repos';\n\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.github-api&cred_key=eq.github_pat&select=cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0 || !creds[0].cred_value) {\n  return [{ json: { error: 'GitHub PAT not configured. Use add_credential to set it up.' } }];\n}\n\nconst token = creds[0].cred_value;\nconst ghHeaders = {\n  'Authorization': 'Bearer ' + token,\n  'Accept': 'application/vnd.github+json',\n  'X-GitHub-Api-Version': '2022-11-28'\n};\n\nfunction formatNumber(n) {\n  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';\n  return String(n);\n}\n\nfunction repoUrl(owner, repo) {\n  return 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);\n}\n\n// === search_repos ===\nif (action === 'search_repos') {\n  const query = input.query;\n  if (!query) return [{ json: { error: 'Parameter \"query\" is required.' } }];\n  const sort = input.sort || 'stars';\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/search/repositories?q=' + encodeURIComponent(query) + '&sort=' + sort + '&per_page=5',\n      headers: ghHeaders\n    });\n\n    if (!data.items || data.items.length === 0) {\n      return [{ json: { error: 'No repositories found for \"' + query + '\".' } }];\n    }\n\n    let result = 'GitHub repos for \"' + query + '\" (' + data.total_count + ' total):\\n\\n';\n    for (const r of data.items) {\n      result += '**' + r.full_name + '**';\n      result += ' — ' + formatNumber(r.stargazers_count) + ' stars, ' + formatNumber(r.forks_count) + ' forks\\n';\n      if (r.description) result += r.description.substring(0, 150) + '\\n';\n      if (r.language) result += 'Language: ' + r.language + '\\n';\n      result += r.html_url + '\\n\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'GitHub search failed: ' + err.message } }];\n  }\n\n// === get_repo_info ===\n} else if (action === 'get_repo_info') {\n  const owner = input.owner;\n  const repo = input.repo;\n  if (!owner || !repo) return [{ json: { error: 'Parameters \"owner\" and \"repo\" are required.' } }];\n\n  try {\n    const data = await helpers.httpRequest({ method: 'GET', url: repoUrl(owner, repo), headers: ghHeaders });\n\n    let result = '**' + data.full_name + '**\\n';\n    if (data.description) result += data.description + '\\n';\n    result += '\\n';\n    result += 'Stars: ' + formatNumber(data.stargazers_count) + '\\n';\n    result += 'Forks: ' + formatNumber(data.forks_count) + '\\n';\n    result += 'Open Issues: ' + data.open_issues_count + '\\n';\n    if (data.language) result += 'Language: ' + data.language + '\\n';\n    if (data.license && data.license.spdx_id) result += 'License: ' + data.license.spdx_id + '\\n';\n    result += 'Created: ' + data.created_at.split('T')[0] + '\\n';\n    result += 'Last Push: ' + data.pushed_at.split('T')[0] + '\\n';\n    if (data.topics && data.topics.length > 0) result += 'Topics: ' + data.topics.join(', ') + '\\n';\n    result += 'Default Branch: ' + data.default_branch + '\\n';\n    result += 'URL: ' + data.html_url + '\\n';\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to get repo info: ' + err.message } }];\n  }\n\n// === list_issues ===\n} else if (action === 'list_issues') {\n  const owner = input.owner;\n  const repo = input.repo;\n  if (!owner || !repo) return [{ json: { error: 'Parameters \"owner\" and \"repo\" are required.' } }];\n  const state = input.state || 'open';\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: repoUrl(owner, repo) + '/issues?state=' + state + '&per_page=10',\n      headers: ghHeaders\n    });\n\n    if (!data || data.length === 0) {\n      return [{ json: { result: 'No ' + state + ' issues found in ' + owner + '/' + repo + '.' } }];\n    }\n\n    const issues = data.filter(i => !i.pull_request);\n    if (issues.length === 0) {\n      return [{ json: { result: 'No ' + state + ' issues found in ' + owner + '/' + repo + ' (only pull requests).' } }];\n    }\n\n    let result = state.charAt(0).toUpperCase() + state.slice(1) + ' issues in ' + owner + '/' + repo + ':\\n\\n';\n    for (const i of issues) {\n      result += '#' + i.number + ' — **' + i.title + '**\\n';\n      if (i.labels && i.labels.length > 0) result += '  Labels: ' + i.labels.map(l => l.name).join(', ') + '\\n';\n      result += '  Created: ' + i.created_at.split('T')[0];\n      if (i.assignee) result += ' | Assignee: ' + i.assignee.login;\n      result += '\\n\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list issues: ' + err.message } }];\n  }\n\n// === create_issue ===\n} else if (action === 'create_issue') {\n  const owner = input.owner;\n  const repo = input.repo;\n  const title = input.title;\n  if (!owner || !repo || !title) return [{ json: { error: 'Parameters \"owner\", \"repo\", and \"title\" are required.' } }];\n\n  try {\n    const body = { title };\n    if (input.body) body.body = input.body;\n    if (input.labels) body.labels = input.labels.split(',').map(l => l.trim());\n\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: repoUrl(owner, repo) + '/issues',\n      headers: { ...ghHeaders, 'Content-Type': 'application/json' },\n      body: JSON.stringify(body)\n    });\n    return [{ json: { result: 'Issue created: #' + data.number + ' — ' + data.title + '\\n' + data.html_url } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to create issue: ' + err.message } }];\n  }\n\n// === list_pull_requests ===\n} else if (action === 'list_pull_requests') {\n  const owner = input.owner;\n  const repo = input.repo;\n  if (!owner || !repo) return [{ json: { error: 'Parameters \"owner\" and \"repo\" are required.' } }];\n  const state = input.state || 'open';\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: repoUrl(owner, repo) + '/pulls?state=' + state + '&per_page=10',\n      headers: ghHeaders\n    });\n\n    if (!data || data.length === 0) {\n      return [{ json: { result: 'No ' + state + ' pull requests in ' + owner + '/' + repo + '.' } }];\n    }\n\n    let result = state.charAt(0).toUpperCase() + state.slice(1) + ' PRs in ' + owner + '/' + repo + ':\\n\\n';\n    for (const pr of data) {\n      result += '#' + pr.number + ' — **' + pr.title + '**\\n';\n      result += '  ' + pr.user.login + ' | ' + pr.head.ref + ' -> ' + pr.base.ref + '\\n';\n      if (pr.draft) result += '  [DRAFT]\\n';\n      result += '  Created: ' + pr.created_at.split('T')[0];\n      if (pr.merged_at) result += ' | Merged: ' + pr.merged_at.split('T')[0];\n      result += '\\n\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list PRs: ' + err.message } }];\n  }\n\n// === get_pull_request ===\n} else if (action === 'get_pull_request') {\n  const owner = input.owner;\n  const repo = input.repo;\n  const prNumber = input.pr_number;\n  if (!owner || !repo || !prNumber) return [{ json: { error: 'Parameters \"owner\", \"repo\", and \"pr_number\" are required.' } }];\n\n  try {\n    const pr = await helpers.httpRequest({\n      method: 'GET',\n      url: repoUrl(owner, repo) + '/pulls/' + prNumber,\n      headers: ghHeaders\n    });\n\n    let result = '#' + pr.number + ' — **' + pr.title + '**\\n';\n    result += 'Author: ' + pr.user.login + '\\n';\n    result += 'State: ' + pr.state;\n    if (pr.draft) result += ' (draft)';\n    if (pr.merged) result += ' (merged)';\n    result += '\\n';\n    result += 'Branch: ' + pr.head.ref + ' -> ' + pr.base.ref + '\\n';\n    result += 'Changed Files: ' + pr.changed_files + ' | +' + pr.additions + ' -' + pr.deletions + '\\n';\n    result += 'Commits: ' + pr.commits + '\\n';\n    if (pr.body) result += '\\nDescription:\\n' + pr.body.substring(0, 500) + (pr.body.length > 500 ? '...' : '') + '\\n';\n    result += '\\nCreated: ' + pr.created_at.split('T')[0];\n    if (pr.merged_at) result += ' | Merged: ' + pr.merged_at.split('T')[0];\n    result += '\\n' + pr.html_url + '\\n';\n\n    // Get review status\n    try {\n      const reviews = await helpers.httpRequest({\n        method: 'GET',\n        url: repoUrl(owner, repo) + '/pulls/' + prNumber + '/reviews',\n        headers: ghHeaders\n      });\n      if (reviews && reviews.length > 0) {\n        const latest = {};\n        for (const r of reviews) {\n          if (r.state !== 'COMMENTED') latest[r.user.login] = r.state;\n        }\n        const reviewEntries = Object.entries(latest);\n        if (reviewEntries.length > 0) {\n          result += '\\nReviews:\\n';\n          for (const [user, state] of reviewEntries) {\n            result += '  ' + user + ': ' + state + '\\n';\n          }\n        }\n      }\n    } catch(e) { /* non-critical */ }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to get PR: ' + err.message } }];\n  }\n\n// === get_file_content ===\n} else if (action === 'get_file_content') {\n  const owner = input.owner;\n  const repo = input.repo;\n  const path = input.path;\n  if (!owner || !repo || !path) return [{ json: { error: 'Parameters \"owner\", \"repo\", and \"path\" are required.' } }];\n  const ref = input.ref || '';\n\n  try {\n    let url = repoUrl(owner, repo) + '/contents/' + encodeURIComponent(path);\n    if (ref) url += '?ref=' + encodeURIComponent(ref);\n\n    const data = await helpers.httpRequest({ method: 'GET', url, headers: ghHeaders });\n\n    if (Array.isArray(data)) {\n      // It's a directory\n      let result = 'Directory: ' + path + '\\n\\n';\n      for (const item of data) {\n        result += (item.type === 'dir' ? '[dir]  ' : '[file] ') + item.name + '\\n';\n      }\n      return [{ json: { result } }];\n    }\n\n    if (data.type === 'file' && data.content) {\n      const content = Buffer.from(data.content, 'base64').toString('utf-8');\n      const sizeKB = (data.size / 1024).toFixed(1);\n      let result = 'File: ' + data.path + ' (' + sizeKB + ' KB)\\n';\n      // Truncate very large files\n      if (content.length > 5000) {\n        result += '\\n' + content.substring(0, 5000) + '\\n\\n... (truncated, ' + content.length + ' chars total)';\n      } else {\n        result += '\\n' + content;\n      }\n      return [{ json: { result } }];\n    }\n\n    return [{ json: { error: 'Unsupported content type or file too large for API.' } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to get file: ' + err.message } }];\n  }\n\n// === search_code ===\n} else if (action === 'search_code') {\n  const query = input.query;\n  if (!query) return [{ json: { error: 'Parameter \"query\" is required.' } }];\n\n  try {\n    let q = query;\n    if (input.owner && input.repo) q += ' repo:' + input.owner + '/' + input.repo;\n    else if (input.owner) q += ' user:' + input.owner;\n\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/search/code?q=' + encodeURIComponent(q) + '&per_page=10',\n      headers: ghHeaders\n    });\n\n    if (!data.items || data.items.length === 0) {\n      return [{ json: { error: 'No code found matching \"' + query + '\".' } }];\n    }\n\n    let result = 'Code search for \"' + query + '\" (' + data.total_count + ' total):\\n\\n';\n    for (const item of data.items.slice(0, 10)) {\n      result += '**' + item.repository.full_name + '** / ' + item.path + '\\n';\n      result += '  ' + item.html_url + '\\n\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Code search failed: ' + err.message } }];\n  }\n\n// === list_releases ===\n} else if (action === 'list_releases') {\n  const owner = input.owner;\n  const repo = input.repo;\n  if (!owner || !repo) return [{ json: { error: 'Parameters \"owner\" and \"repo\" are required.' } }];\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: repoUrl(owner, repo) + '/releases?per_page=5',\n      headers: ghHeaders\n    });\n\n    if (!data || data.length === 0) {\n      return [{ json: { result: 'No releases found in ' + owner + '/' + repo + '.' } }];\n    }\n\n    let result = 'Releases in ' + owner + '/' + repo + ':\\n\\n';\n    for (const r of data) {\n      result += '**' + r.tag_name + '**';\n      if (r.name && r.name !== r.tag_name) result += ' — ' + r.name;\n      result += '\\n';\n      result += '  Published: ' + r.published_at.split('T')[0];\n      if (r.prerelease) result += ' [pre-release]';\n      if (r.draft) result += ' [draft]';\n      result += '\\n';\n      if (r.body) result += '  ' + r.body.substring(0, 200) + (r.body.length > 200 ? '...' : '') + '\\n';\n      result += '\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list releases: ' + err.message } }];\n  }\n\n// === list_notifications ===\n} else if (action === 'list_notifications') {\n  try {\n    const all = input.all === 'true' || input.all === true ? 'true' : 'false';\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/notifications?all=' + all + '&per_page=15',\n      headers: ghHeaders\n    });\n\n    if (!data || data.length === 0) {\n      return [{ json: { result: 'No notifications.' } }];\n    }\n\n    let result = 'GitHub Notifications (' + data.length + '):\\n\\n';\n    for (const n of data) {\n      result += '- [' + n.reason + '] **' + n.subject.title + '**\\n';\n      result += '  ' + n.repository.full_name + ' | ' + n.subject.type + '\\n';\n      result += '  Updated: ' + n.updated_at.split('T')[0] + '\\n\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list notifications: ' + err.message } }];\n  }\n\n// === list_starred ===\n} else if (action === 'list_starred') {\n  try {\n    const sort = input.sort || 'created';\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/user/starred?sort=' + sort + '&per_page=10',\n      headers: ghHeaders\n    });\n\n    if (!data || data.length === 0) {\n      return [{ json: { result: 'No starred repositories.' } }];\n    }\n\n    let result = 'Your starred repos:\\n\\n';\n    for (const r of data) {\n      result += '**' + r.full_name + '**';\n      result += ' — ' + formatNumber(r.stargazers_count) + ' stars\\n';\n      if (r.description) result += '  ' + r.description.substring(0, 120) + '\\n';\n      if (r.language) result += '  Language: ' + r.language + '\\n';\n      result += '\\n';\n    }\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list starred repos: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Available: search_repos, get_repo_info, list_issues, create_issue, list_pull_requests, get_pull_request, get_file_content, search_code, list_releases, list_notifications, list_starred.' } }];\n}\n"
         }
       }
     ],
@@ -60,11 +60,7 @@
         "parameters": {
           "name": "search_repos",
           "description": "Search GitHub repositories by keyword. Parameters: query (search keywords, required), sort ('stars', 'forks', 'updated', optional, default 'stars')",
-          "workflowId": {
-            "__rl": true,
-            "value": "REPLACE_SUB_WORKFLOW_ID",
-            "mode": "id"
-          },
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
           "workflowInputs": {
             "mappingMode": "defineBelow",
             "value": {
@@ -78,8 +74,7 @@
               { "id": "query", "displayName": "query", "type": "string", "description": "Search keywords", "required": true },
               { "id": "sort", "displayName": "sort", "type": "string", "description": "Sort by: stars, forks, or updated", "required": false }
             ],
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false
+            "attemptToConvertTypes": false, "convertFieldsToString": false
           }
         }
       },
@@ -92,11 +87,7 @@
         "parameters": {
           "name": "get_repo_info",
           "description": "Get detailed info about a GitHub repository. Parameters: owner (repo owner/org, required), repo (repository name, required)",
-          "workflowId": {
-            "__rl": true,
-            "value": "REPLACE_SUB_WORKFLOW_ID",
-            "mode": "id"
-          },
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
           "workflowInputs": {
             "mappingMode": "defineBelow",
             "value": {
@@ -110,8 +101,7 @@
               { "id": "owner", "displayName": "owner", "type": "string", "description": "Repository owner", "required": true },
               { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true }
             ],
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false
+            "attemptToConvertTypes": false, "convertFieldsToString": false
           }
         }
       },
@@ -124,11 +114,7 @@
         "parameters": {
           "name": "list_issues",
           "description": "List issues for a GitHub repository. Parameters: owner (repo owner, required), repo (repository name, required), state ('open', 'closed', or 'all', optional, default 'open')",
-          "workflowId": {
-            "__rl": true,
-            "value": "REPLACE_SUB_WORKFLOW_ID",
-            "mode": "id"
-          },
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
           "workflowInputs": {
             "mappingMode": "defineBelow",
             "value": {
@@ -142,10 +128,9 @@
               { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
               { "id": "owner", "displayName": "owner", "type": "string", "description": "Repository owner", "required": true },
               { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true },
-              { "id": "state", "displayName": "state", "type": "string", "description": "Issue state: open, closed, or all", "required": false }
+              { "id": "state", "displayName": "state", "type": "string", "description": "Issue state", "required": false }
             ],
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false
+            "attemptToConvertTypes": false, "convertFieldsToString": false
           }
         }
       },
@@ -158,11 +143,7 @@
         "parameters": {
           "name": "create_issue",
           "description": "Create a new issue in a GitHub repository. Parameters: owner (repo owner, required), repo (repository name, required), title (issue title, required), body (issue description, optional), labels (comma-separated label names, optional)",
-          "workflowId": {
-            "__rl": true,
-            "value": "REPLACE_SUB_WORKFLOW_ID",
-            "mode": "id"
-          },
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
           "workflowInputs": {
             "mappingMode": "defineBelow",
             "value": {
@@ -180,27 +161,220 @@
               { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true },
               { "id": "title", "displayName": "title", "type": "string", "description": "Issue title", "required": true },
               { "id": "body", "displayName": "body", "type": "string", "description": "Issue description", "required": false },
-              { "id": "labels", "displayName": "labels", "type": "string", "description": "Comma-separated label names", "required": false }
+              { "id": "labels", "displayName": "labels", "type": "string", "description": "Comma-separated labels", "required": false }
             ],
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": false
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-list-prs",
+        "name": "list_pull_requests",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 600],
+        "parameters": {
+          "name": "list_pull_requests",
+          "description": "List pull requests for a GitHub repository. Parameters: owner (repo owner, required), repo (repository name, required), state ('open', 'closed', or 'all', optional, default 'open')",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "list_pull_requests",
+              "owner": "={{ $fromAI('owner', 'Repository owner or organization', 'string') }}",
+              "repo": "={{ $fromAI('repo', 'Repository name', 'string') }}",
+              "state": "={{ $fromAI('state', 'PR state: open, closed, or all (default: open)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "owner", "displayName": "owner", "type": "string", "description": "Repository owner", "required": true },
+              { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true },
+              { "id": "state", "displayName": "state", "type": "string", "description": "PR state", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-get-pr",
+        "name": "get_pull_request",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 600],
+        "parameters": {
+          "name": "get_pull_request",
+          "description": "Get details of a specific pull request including diff stats and reviews. Parameters: owner (repo owner, required), repo (repository name, required), pr_number (PR number, required)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "get_pull_request",
+              "owner": "={{ $fromAI('owner', 'Repository owner or organization', 'string') }}",
+              "repo": "={{ $fromAI('repo', 'Repository name', 'string') }}",
+              "pr_number": "={{ $fromAI('pr_number', 'Pull request number', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "owner", "displayName": "owner", "type": "string", "description": "Repository owner", "required": true },
+              { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true },
+              { "id": "pr_number", "displayName": "pr_number", "type": "string", "description": "Pull request number", "required": true }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-file-content",
+        "name": "get_file_content",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [500, 600],
+        "parameters": {
+          "name": "get_file_content",
+          "description": "Read a file or list a directory from a GitHub repository. Parameters: owner (repo owner, required), repo (repository name, required), path (file or directory path, required), ref (branch/tag/commit, optional, default: default branch)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "get_file_content",
+              "owner": "={{ $fromAI('owner', 'Repository owner or organization', 'string') }}",
+              "repo": "={{ $fromAI('repo', 'Repository name', 'string') }}",
+              "path": "={{ $fromAI('path', 'File or directory path (e.g. README.md, src/index.js)', 'string') }}",
+              "ref": "={{ $fromAI('ref', 'Branch, tag, or commit SHA (optional)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "owner", "displayName": "owner", "type": "string", "description": "Repository owner", "required": true },
+              { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true },
+              { "id": "path", "displayName": "path", "type": "string", "description": "File or directory path", "required": true },
+              { "id": "ref", "displayName": "ref", "type": "string", "description": "Branch, tag, or commit", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-search-code",
+        "name": "search_code",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [750, 600],
+        "parameters": {
+          "name": "search_code",
+          "description": "Search code across GitHub repositories. Parameters: query (search keywords, required), owner (limit to user/org, optional), repo (limit to specific repo, optional — requires owner too)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "search_code",
+              "query": "={{ $fromAI('query', 'Code search keywords', 'string') }}",
+              "owner": "={{ $fromAI('owner', 'Limit to user or organization (optional)', 'string') }}",
+              "repo": "={{ $fromAI('repo', 'Limit to specific repo (optional, requires owner)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "query", "displayName": "query", "type": "string", "description": "Code search keywords", "required": true },
+              { "id": "owner", "displayName": "owner", "type": "string", "description": "User or organization", "required": false },
+              { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-list-releases",
+        "name": "list_releases",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 900],
+        "parameters": {
+          "name": "list_releases",
+          "description": "List releases for a GitHub repository. Parameters: owner (repo owner, required), repo (repository name, required)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "list_releases",
+              "owner": "={{ $fromAI('owner', 'Repository owner or organization', 'string') }}",
+              "repo": "={{ $fromAI('repo', 'Repository name', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "owner", "displayName": "owner", "type": "string", "description": "Repository owner", "required": true },
+              { "id": "repo", "displayName": "repo", "type": "string", "description": "Repository name", "required": true }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-notifications",
+        "name": "list_notifications",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 900],
+        "parameters": {
+          "name": "list_notifications",
+          "description": "List your GitHub notifications. Parameters: all ('true' to include read notifications, optional, default only unread)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "list_notifications",
+              "all": "={{ $fromAI('all', 'Include read notifications: true or false (default: false)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "all", "displayName": "all", "type": "string", "description": "Include read notifications", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-starred",
+        "name": "list_starred",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [500, 900],
+        "parameters": {
+          "name": "list_starred",
+          "description": "List your starred GitHub repositories. Parameters: sort ('created' or 'updated', optional, default 'created')",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "list_starred",
+              "sort": "={{ $fromAI('sort', 'Sort by: created or updated (default: created)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "sort", "displayName": "sort", "type": "string", "description": "Sort by: created or updated", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
           }
         }
       }
     ],
     "connections": {
-      "search_repos": {
-        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
-      },
-      "get_repo_info": {
-        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
-      },
-      "list_issues": {
-        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
-      },
-      "create_issue": {
-        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
-      }
+      "search_repos": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "get_repo_info": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "list_issues": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "create_issue": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "list_pull_requests": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "get_pull_request": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "get_file_content": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "search_code": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "list_releases": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "list_notifications": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "list_starred": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] }
     }
   }
 }

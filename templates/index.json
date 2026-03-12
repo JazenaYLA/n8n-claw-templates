@@ -170,7 +170,7 @@
       "name": "GitHub",
       "type": "native",
       "category": "productivity",
-      "description": "Search repositories, get repo info, list issues, and create issues on GitHub",
+      "description": "Full GitHub integration: repos, issues, PRs, code search, file content, releases, notifications, starred repos",
       "credentials_required": [
         {
           "key": "github_pat",

@@ -1,11 +1,11 @@
 {
   "id": "github-api",
   "name": "GitHub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "updated": "2026-03-12",
   "type": "native",
   "category": "productivity",
-  "description": "Search repositories, get repo info, list issues, and create issues on GitHub",
+  "description": "Full GitHub integration: repos, issues, PRs, code search, file content, releases, notifications, and starred repos",
   "credentials_required": [
     {
       "key": "github_pat",
@@ -30,6 +30,34 @@
     {
       "name": "create_issue",
       "description": "Create a new issue in a GitHub repository"
+    },
+    {
+      "name": "list_pull_requests",
+      "description": "List pull requests for a GitHub repository"
+    },
+    {
+      "name": "get_pull_request",
+      "description": "Get details of a specific pull request"
+    },
+    {
+      "name": "get_file_content",
+      "description": "Read a file from a GitHub repository"
+    },
+    {
+      "name": "search_code",
+      "description": "Search code across GitHub repositories"
+    },
+    {
+      "name": "list_releases",
+      "description": "List releases for a GitHub repository"
+    },
+    {
+      "name": "list_notifications",
+      "description": "List your GitHub notifications"
+    },
+    {
+      "name": "list_starred",
+      "description": "List your starred GitHub repositories"
     }
   ],
   "author": "freddy-schuetz",
