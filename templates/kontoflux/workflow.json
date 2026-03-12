@@ -97,11 +97,11 @@
             "matchingColumns": [],
             "schema": [
               { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
-              { "id": "account_id", "displayName": "account_id", "type": "string", "description": "Account ID or empty string", "required": true },
-              { "id": "category", "displayName": "category", "type": "string", "description": "Category filter or empty string", "required": true },
-              { "id": "after", "displayName": "after", "type": "string", "description": "Start date or empty string", "required": true },
-              { "id": "before", "displayName": "before", "type": "string", "description": "End date or empty string", "required": true },
-              { "id": "limit", "displayName": "limit", "type": "string", "description": "Max results or empty string", "required": true }
+              { "id": "account_id", "displayName": "account_id", "type": "string", "description": "Numeric account ID from list_accounts", "required": false },
+              { "id": "category", "displayName": "category", "type": "string", "description": "Category name filter", "required": false },
+              { "id": "after", "displayName": "after", "type": "string", "description": "Start date YYYY-MM-DD", "required": false },
+              { "id": "before", "displayName": "before", "type": "string", "description": "End date YYYY-MM-DD", "required": false },
+              { "id": "limit", "displayName": "limit", "type": "string", "description": "Max results 1-250", "required": false }
             ],
             "attemptToConvertTypes": false, "convertFieldsToString": false
           }
@@ -130,9 +130,9 @@
             "schema": [
               { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
               { "id": "query", "displayName": "query", "type": "string", "description": "Search text", "required": true },
-              { "id": "after", "displayName": "after", "type": "string", "description": "Start date or empty string", "required": true },
-              { "id": "before", "displayName": "before", "type": "string", "description": "End date or empty string", "required": true },
-              { "id": "limit", "displayName": "limit", "type": "string", "description": "Max results or empty string", "required": true }
+              { "id": "after", "displayName": "after", "type": "string", "description": "Start date YYYY-MM-DD", "required": false },
+              { "id": "before", "displayName": "before", "type": "string", "description": "End date YYYY-MM-DD", "required": false },
+              { "id": "limit", "displayName": "limit", "type": "string", "description": "Max results 1-250", "required": false }
             ],
             "attemptToConvertTypes": false, "convertFieldsToString": false
           }
