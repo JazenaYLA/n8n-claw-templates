@@ -6,26 +6,83 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 
 ## Available Skills
 
-| Category | Skill | Description | Credentials | Author |
-|----------|-------|-------------|-------------|--------|
-| communication | [email-imap-smtp](templates/email-imap-smtp/) | Read and send emails via IMAP/SMTP | Email address, password, IMAP host, SMTP host | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| finance | [crypto-prices](templates/crypto-prices/) | Get cryptocurrency prices, market cap, and 24h changes | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| finance | [exchange-rates](templates/exchange-rates/) | Convert currencies using live exchange rates | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| knowledge | [wikipedia](templates/wikipedia/) | Search Wikipedia and get article summaries | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| language | [dictionary](templates/dictionary/) | English word definitions, phonetics, and examples | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| network | [ip-geolocation](templates/ip-geolocation/) | Get location, ISP, and org info for any IP address | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| network | [website-check](templates/website-check/) | Website health check: load time, security headers, meta tags, structured data | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| news | [hackernews](templates/hackernews/) | Search Hacker News stories and get top stories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| news | [news-newsapi](templates/news-newsapi/) | Search news articles from 80,000+ sources | NewsAPI Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| reference | [country-info](templates/country-info/) | Country details: capital, population, languages, currencies | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| reference | [public-holidays](templates/public-holidays/) | Look up public holidays for any country | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| reference | [timezone-world-clock](templates/timezone-world-clock/) | Get current time in any timezone and convert between timezones | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| meetings | [vexa-meetings](templates/vexa-meetings/) | Deploy transcription bots to Google Meet, Teams, and Zoom meetings | Vexa API Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| entertainment | [recipes](templates/recipes/) | Search recipes or get a random recipe with ingredients and instructions | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| entertainment | [trivia](templates/trivia/) | Random trivia questions with answers from various categories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| transport | [wiener-linien](templates/wiener-linien/) | Plan routes with Vienna public transport (Wiener Linien), get your station ID from [this CSV File](https://data.wien.gv.at/csv/wienerlinien-ogd-haltestellen.csv) (yes, a CSV file, don't ask), more details can be found on the [Wiener Linien Routingservice Wien](https://www.data.gv.at/datasets/9c203fec-dc0d-412c-a7a3-7fd77d0346f1?locale=de) page | None | [@lcx](https://github.com/lcx) |
-| utilities | [qr-code](templates/qr-code/) | Generate QR codes from text or URLs | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
-| weather | [weather-openmeteo](templates/weather-openmeteo/) | Current weather and 3-day forecast for any city | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+### Communication
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [email-imap-smtp](templates/email-imap-smtp/) | Read and send emails via IMAP/SMTP | Email address, password, IMAP host, SMTP host | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Entertainment
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [recipes](templates/recipes/) | Search recipes or get a random recipe with ingredients and instructions | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [trivia](templates/trivia/) | Random trivia questions with answers from various categories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Finance
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [crypto-prices](templates/crypto-prices/) | Get cryptocurrency prices, market cap, and 24h changes | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [exchange-rates](templates/exchange-rates/) | Convert currencies using live exchange rates | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Knowledge
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [wikipedia](templates/wikipedia/) | Search Wikipedia and get article summaries | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Language
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [dictionary](templates/dictionary/) | English word definitions, phonetics, and examples | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Meetings
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [vexa-meetings](templates/vexa-meetings/) | Deploy transcription bots to Google Meet, Teams, and Zoom meetings | Vexa API Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Network
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [ip-geolocation](templates/ip-geolocation/) | Get location, ISP, and org info for any IP address | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [website-check](templates/website-check/) | Website health check: load time, security headers, meta tags, structured data | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### News
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [hackernews](templates/hackernews/) | Search Hacker News stories and get top stories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [news-newsapi](templates/news-newsapi/) | Search news articles from 80,000+ sources | NewsAPI Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Reference
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [country-info](templates/country-info/) | Country details: capital, population, languages, currencies | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [public-holidays](templates/public-holidays/) | Look up public holidays for any country | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| [timezone-world-clock](templates/timezone-world-clock/) | Get current time in any timezone and convert between timezones | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Transport
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [wiener-linien](templates/wiener-linien/) | Plan routes with Vienna public transport (Wiener Linien), get your station ID from [this CSV File](https://data.wien.gv.at/csv/wienerlinien-ogd-haltestellen.csv) (yes, a CSV file, don't ask), more details can be found on the [Wiener Linien Routingservice Wien](https://www.data.gv.at/datasets/9c203fec-dc0d-412c-a7a3-7fd77d0346f1?locale=de) page | None | [@lcx](https://github.com/lcx) |
+
+### Utilities
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [qr-code](templates/qr-code/) | Generate QR codes from text or URLs | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
+### Weather
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [weather-openmeteo](templates/weather-openmeteo/) | Current weather and 3-day forecast for any city | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ---
 
