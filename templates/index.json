@@ -110,6 +110,15 @@
       "description": "Generate QR codes from text or URLs (goqr.me API, free)",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "public-holidays",
+      "name": "Public Holidays",
+      "type": "native",
+      "category": "reference",
+      "description": "Look up public holidays for any country (Nager.Date API, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }
