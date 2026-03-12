@@ -137,6 +137,15 @@
       "description": "Get cryptocurrency prices, market cap, and 24h changes (CoinGecko API, free)",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "trivia",
+      "name": "Trivia",
+      "type": "native",
+      "category": "entertainment",
+      "description": "Get random trivia questions with answers from various categories (Open Trivia DB, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }

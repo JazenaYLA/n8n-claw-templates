@@ -1,0 +1,111 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Trivia",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Get Trivia",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst amount = Math.min(Math.max(parseInt(input.amount) || 1, 1), 10);\nconst difficulty = input.difficulty || '';\nconst category = input.category || '';\n\n// Category mapping\nconst categories = {\n  'general': 9, 'books': 10, 'film': 11, 'music': 12, 'theatre': 13,\n  'television': 14, 'tv': 14, 'video games': 15, 'board games': 16,\n  'science': 17, 'science nature': 17, 'computers': 18, 'computer': 18,\n  'mathematics': 19, 'math': 19, 'mythology': 20, 'sports': 21,\n  'geography': 22, 'history': 23, 'politics': 24, 'art': 25,\n  'celebrities': 26, 'animals': 27, 'vehicles': 28, 'comics': 29,\n  'gadgets': 30, 'anime': 31, 'manga': 31, 'cartoons': 32, 'cartoon': 32\n};\n\nlet url = 'https://opentdb.com/api.php?amount=' + amount;\n\nif (difficulty && ['easy', 'medium', 'hard'].includes(difficulty.toLowerCase())) {\n  url += '&difficulty=' + difficulty.toLowerCase();\n}\n\nif (category) {\n  const catId = categories[category.toLowerCase()];\n  if (catId) url += '&category=' + catId;\n}\n\ntry {\n  const data = await helpers.httpRequest({ method: 'GET', url });\n\n  if (data.response_code !== 0) {\n    const errors = {\n      1: 'Not enough questions available for these filters. Try fewer questions or different category/difficulty.',\n      2: 'Invalid category or difficulty parameter.',\n      5: 'Rate limit exceeded. Please wait a moment.'\n    };\n    return [{ json: { error: errors[data.response_code] || 'API error (code ' + data.response_code + ')' } }];\n  }\n\n  // Decode HTML entities\n  function decode(str) {\n    return str.replace(/&quot;/g, '\"').replace(/&#039;/g, \"'\").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&eacute;/g, 'e').replace(/&ouml;/g, 'oe').replace(/&uuml;/g, 'ue').replace(/&auml;/g, 'ae').replace(/&szlig;/g, 'ss').replace(/&ldquo;/g, '\"').replace(/&rdquo;/g, '\"').replace(/&lsquo;/g, \"'\").replace(/&rsquo;/g, \"'\").replace(/&hellip;/g, '...');\n  }\n\n  let result = '';\n  data.results.forEach((q, i) => {\n    const num = amount > 1 ? (i + 1) + '. ' : '';\n    result += num + decode(q.question) + '\\n';\n    result += '  Category: ' + decode(q.category) + '\\n';\n    result += '  Difficulty: ' + q.difficulty + '\\n';\n\n    if (q.type === 'boolean') {\n      result += '  Type: True/False\\n';\n    } else {\n      // Shuffle answers\n      const answers = [...q.incorrect_answers.map(decode), decode(q.correct_answer)];\n      for (let j = answers.length - 1; j > 0; j--) {\n        const k = Math.floor(Math.random() * (j + 1));\n        [answers[j], answers[k]] = [answers[k], answers[j]];\n      }\n      const letters = ['A', 'B', 'C', 'D'];\n      answers.forEach((a, idx) => {\n        result += '  ' + letters[idx] + ') ' + a + '\\n';\n      });\n    }\n\n    result += '  Answer: ' + decode(q.correct_answer) + '\\n\\n';\n  });\n\n  return [{ json: { result: result.trim() } }];\n\n} catch (err) {\n  return [{ json: { error: 'Failed to fetch trivia: ' + err.message } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Get Trivia", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Trivia",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "trivia"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "get_trivia",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "get_trivia",
+          "description": "Get random trivia questions with answers. Parameters: amount (number of questions, 1-10, default 1), category (optional, e.g. 'science', 'history', 'geography', 'sports', 'art', 'music', 'film', 'animals', 'computers', 'mathematics', 'general'), difficulty (optional: 'easy', 'medium', 'hard')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "amount": "={{ $fromAI('amount', 'Number of trivia questions (1-10, default 1)', 'number') }}",
+              "category": "={{ $fromAI('category', 'Trivia category (e.g. science, history, geography, sports). Optional.', 'string') }}",
+              "difficulty": "={{ $fromAI('difficulty', 'Difficulty: easy, medium, or hard. Optional.', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "amount",
+                "displayName": "amount",
+                "type": "number",
+                "description": "Number of trivia questions (1-10, default 1)",
+                "required": false
+              },
+              {
+                "id": "category",
+                "displayName": "category",
+                "type": "string",
+                "description": "Trivia category (e.g. science, history, geography, sports)",
+                "required": false
+              },
+              {
+                "id": "difficulty",
+                "displayName": "difficulty",
+                "type": "string",
+                "description": "Difficulty: easy, medium, or hard",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "get_trivia": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}
