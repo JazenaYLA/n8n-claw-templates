@@ -1,0 +1,24 @@
+{
+  "id": "timezone-world-clock",
+  "name": "Timezone & World Clock",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "reference",
+  "description": "Get current time in any timezone and convert between timezones (TimeAPI, free)",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "get_time",
+      "description": "Get current date and time in a specific timezone"
+    },
+    {
+      "name": "convert_timezone",
+      "description": "Convert a date/time from one timezone to another"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

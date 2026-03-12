@@ -1,0 +1,164 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Timezone & World Clock",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Timezone Logic",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'get_time';\n\n// Common timezone aliases\nconst aliases = {\n  'est': 'America/New_York', 'eastern': 'America/New_York',\n  'cst': 'America/Chicago', 'central': 'America/Chicago',\n  'mst': 'America/Denver', 'mountain': 'America/Denver',\n  'pst': 'America/Los_Angeles', 'pacific': 'America/Los_Angeles',\n  'gmt': 'Europe/London', 'utc': 'Etc/UTC',\n  'cet': 'Europe/Berlin', 'met': 'Europe/Berlin',\n  'eet': 'Europe/Helsinki',\n  'jst': 'Asia/Tokyo', 'ist': 'Asia/Kolkata',\n  'cst_china': 'Asia/Shanghai', 'aest': 'Australia/Sydney',\n  'nzst': 'Pacific/Auckland',\n  'berlin': 'Europe/Berlin', 'london': 'Europe/London',\n  'paris': 'Europe/Paris', 'tokyo': 'Asia/Tokyo',\n  'new york': 'America/New_York', 'los angeles': 'America/Los_Angeles',\n  'chicago': 'America/Chicago', 'denver': 'America/Denver',\n  'sydney': 'Australia/Sydney', 'auckland': 'Pacific/Auckland',\n  'mumbai': 'Asia/Kolkata', 'dubai': 'Asia/Dubai',\n  'singapore': 'Asia/Singapore', 'hong kong': 'Asia/Hong_Kong',\n  'shanghai': 'Asia/Shanghai', 'beijing': 'Asia/Shanghai',\n  'moscow': 'Europe/Moscow', 'vienna': 'Europe/Vienna',\n  'zurich': 'Europe/Zurich', 'amsterdam': 'Europe/Amsterdam',\n  'rome': 'Europe/Rome', 'madrid': 'Europe/Madrid',\n  'lisbon': 'Europe/Lisbon', 'stockholm': 'Europe/Stockholm',\n  'warsaw': 'Europe/Warsaw', 'prague': 'Europe/Prague',\n  'budapest': 'Europe/Budapest', 'athens': 'Europe/Athens',\n  'istanbul': 'Europe/Istanbul', 'cairo': 'Africa/Cairo',\n  'johannesburg': 'Africa/Johannesburg', 'nairobi': 'Africa/Nairobi',\n  'sao paulo': 'America/Sao_Paulo', 'buenos aires': 'America/Argentina/Buenos_Aires',\n  'mexico city': 'America/Mexico_City', 'toronto': 'America/Toronto',\n  'vancouver': 'America/Vancouver', 'honolulu': 'Pacific/Honolulu',\n  'anchorage': 'America/Anchorage', 'seoul': 'Asia/Seoul',\n  'bangkok': 'Asia/Bangkok', 'jakarta': 'Asia/Jakarta'\n};\n\nfunction resolveTimezone(tz) {\n  if (!tz) return 'Europe/Berlin';\n  const lower = tz.toLowerCase().trim();\n  return aliases[lower] || tz;\n}\n\nif (action === 'get_time') {\n  const timezone = resolveTimezone(input.timezone);\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://timeapi.io/api/time/current/zone?timeZone=' + encodeURIComponent(timezone)\n    });\n\n    if (!data || !data.dateTime) {\n      return [{ json: { error: 'Could not get time for timezone \"' + timezone + '\". Use IANA format (e.g. Europe/Berlin, America/New_York).' } }];\n    }\n\n    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];\n    const dayName = days[data.dayOfWeek] || data.dayOfWeek;\n\n    let result = timezone + '\\n';\n    result += '  Date: ' + dayName + ', ' + data.date + '\\n';\n    result += '  Time: ' + data.time + '\\n';\n    result += '  UTC Offset: ' + (data.utcOffset || 'N/A') + '\\n';\n    result += '  DST: ' + (data.dstActive ? 'Yes' : 'No');\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to get time: ' + err.message + '. Make sure timezone is valid IANA format (e.g. Europe/Berlin).' } }];\n  }\n\n} else if (action === 'convert_timezone') {\n  const fromTz = resolveTimezone(input.from_timezone);\n  const toTz = resolveTimezone(input.to_timezone);\n  const datetime = input.datetime || '';\n\n  if (!datetime) {\n    return [{ json: { error: 'Parameter \"datetime\" is required (format: YYYY-MM-DD HH:MM:SS).' } }];\n  }\n\n  try {\n    const body = {\n      fromTimeZone: fromTz,\n      dateTime: datetime,\n      toTimeZone: toTz,\n      dstAmbiguity: ''\n    };\n\n    const data = await helpers.httpRequest({\n      method: 'POST',\n      url: 'https://timeapi.io/api/conversion/converttimezone',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify(body)\n    });\n\n    if (!data || !data.conversionResult) {\n      return [{ json: { error: 'Conversion failed. Check timezone names and datetime format (YYYY-MM-DD HH:MM:SS).' } }];\n    }\n\n    const cr = data.conversionResult;\n    let result = 'Conversion Result\\n';\n    result += '  From: ' + fromTz + ' — ' + data.originalDateTime + '\\n';\n    result += '  To:   ' + toTz + ' — ' + cr.dateTime + '\\n';\n    result += '  UTC Offset: ' + (cr.utcOffset || 'N/A') + '\\n';\n    result += '  DST: ' + (cr.dstActive ? 'Yes' : 'No');\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Conversion failed: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use get_time or convert_timezone.' } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Timezone Logic", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Timezone & World Clock",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "timezone-world-clock"
+        }
+      },
+      {
+        "id": "tool-get-time",
+        "name": "get_time",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "get_time",
+          "description": "Get current date and time in a specific timezone. Parameter: timezone (IANA timezone like 'Europe/Berlin', 'America/New_York', or city name like 'Tokyo', 'London', or abbreviation like 'CET', 'EST')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "get_time",
+              "timezone": "={{ $fromAI('timezone', 'Timezone: IANA format (Europe/Berlin), city name (Tokyo), or abbreviation (CET)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "timezone",
+                "displayName": "timezone",
+                "type": "string",
+                "description": "Timezone: IANA format (Europe/Berlin), city name (Tokyo), or abbreviation (CET)",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-convert-tz",
+        "name": "convert_timezone",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 300],
+        "parameters": {
+          "name": "convert_timezone",
+          "description": "Convert a date/time from one timezone to another. Parameters: from_timezone (source timezone), to_timezone (target timezone), datetime (format: YYYY-MM-DD HH:MM:SS)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "convert_timezone",
+              "from_timezone": "={{ $fromAI('from_timezone', 'Source timezone', 'string') }}",
+              "to_timezone": "={{ $fromAI('to_timezone', 'Target timezone', 'string') }}",
+              "datetime": "={{ $fromAI('datetime', 'Date and time to convert (YYYY-MM-DD HH:MM:SS)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "from_timezone",
+                "displayName": "from_timezone",
+                "type": "string",
+                "description": "Source timezone",
+                "required": true
+              },
+              {
+                "id": "to_timezone",
+                "displayName": "to_timezone",
+                "type": "string",
+                "description": "Target timezone",
+                "required": true
+              },
+              {
+                "id": "datetime",
+                "displayName": "datetime",
+                "type": "string",
+                "description": "Date and time to convert (YYYY-MM-DD HH:MM:SS)",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "get_time": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "convert_timezone": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

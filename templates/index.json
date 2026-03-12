@@ -146,6 +146,15 @@
       "description": "Get random trivia questions with answers from various categories (Open Trivia DB, free)",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "timezone-world-clock",
+      "name": "Timezone & World Clock",
+      "type": "native",
+      "category": "reference",
+      "description": "Get current time in any timezone and convert between timezones (TimeAPI, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }
