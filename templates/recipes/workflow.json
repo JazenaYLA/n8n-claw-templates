@@ -1,0 +1,140 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Recipes",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Recipe Logic",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'search_recipe';\n\nfunction formatMeal(meal) {\n  let result = meal.strMeal;\n  if (meal.strArea) result += ' (' + meal.strArea + ')';\n  if (meal.strCategory) result += ' — ' + meal.strCategory;\n  result += '\\n';\n\n  // Ingredients\n  const ingredients = [];\n  for (let i = 1; i <= 20; i++) {\n    const ing = meal['strIngredient' + i];\n    const measure = meal['strMeasure' + i];\n    if (ing && ing.trim()) {\n      ingredients.push((measure ? measure.trim() + ' ' : '') + ing.trim());\n    }\n  }\n  if (ingredients.length > 0) {\n    result += '\\nIngredients:\\n';\n    ingredients.forEach(ing => { result += '  - ' + ing + '\\n'; });\n  }\n\n  // Instructions\n  if (meal.strInstructions) {\n    result += '\\nInstructions:\\n' + meal.strInstructions.trim() + '\\n';\n  }\n\n  // Tags\n  if (meal.strTags) {\n    result += '\\nTags: ' + meal.strTags + '\\n';\n  }\n\n  // Source/YouTube\n  if (meal.strYoutube) {\n    result += 'Video: ' + meal.strYoutube + '\\n';\n  }\n  if (meal.strSource) {\n    result += 'Source: ' + meal.strSource + '\\n';\n  }\n\n  return result;\n}\n\nif (action === 'search_recipe') {\n  const query = input.query;\n  if (!query) {\n    return [{ json: { error: 'Parameter \"query\" is required (recipe name or keyword).' } }];\n  }\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://www.themealdb.com/api/json/v1/1/search.php?s=' + encodeURIComponent(query)\n    });\n\n    if (!data.meals || data.meals.length === 0) {\n      return [{ json: { error: 'No recipes found for \"' + query + '\". Try a different search term.' } }];\n    }\n\n    // Show first result in detail, list others briefly\n    let result = formatMeal(data.meals[0]);\n\n    if (data.meals.length > 1) {\n      result += '\\n---\\nMore results (' + (data.meals.length - 1) + '):\\n';\n      data.meals.slice(1, 5).forEach(m => {\n        result += '  - ' + m.strMeal;\n        if (m.strArea) result += ' (' + m.strArea + ')';\n        if (m.strCategory) result += ' — ' + m.strCategory;\n        result += '\\n';\n      });\n      if (data.meals.length > 5) {\n        result += '  (' + (data.meals.length - 5) + ' more omitted)';\n      }\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to search recipes: ' + err.message } }];\n  }\n\n} else if (action === 'random_recipe') {\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://www.themealdb.com/api/json/v1/1/random.php'\n    });\n\n    if (!data.meals || data.meals.length === 0) {\n      return [{ json: { error: 'Could not fetch a random recipe.' } }];\n    }\n\n    return [{ json: { result: formatMeal(data.meals[0]) } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to get random recipe: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use search_recipe or random_recipe.' } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Recipe Logic", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Recipes",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "recipes"
+        }
+      },
+      {
+        "id": "tool-search",
+        "name": "search_recipe",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "search_recipe",
+          "description": "Search for recipes by name or keyword. Returns ingredients, instructions, and source. Parameter: query (recipe name like 'pasta', 'chicken curry', 'tiramisu')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "search_recipe",
+              "query": "={{ $fromAI('query', 'Recipe name or keyword (e.g. pasta, chicken curry, tiramisu)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "Recipe name or keyword",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-random",
+        "name": "random_recipe",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 300],
+        "parameters": {
+          "name": "random_recipe",
+          "description": "Get a random recipe with full ingredients and instructions. No parameters needed.",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "random_recipe"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "search_recipe": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "random_recipe": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

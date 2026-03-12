@@ -155,6 +155,15 @@
       "description": "Get current time in any timezone and convert between timezones (TimeAPI, free)",
       "credentials_required": [],
       "version": "1.0.0"
+    },
+    {
+      "id": "recipes",
+      "name": "Recipes",
+      "type": "native",
+      "category": "entertainment",
+      "description": "Search recipes by name or get a random recipe with ingredients and instructions (TheMealDB, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }
