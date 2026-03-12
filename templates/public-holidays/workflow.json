@@ -1,0 +1,111 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Public Holidays",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Get Holidays",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst countryCode = (input.country_code || 'DE').toUpperCase();\nconst year = input.year || new Date().getFullYear().toString();\nconst mode = input.mode || 'year';\n\nconst BASE = 'https://date.nager.at/api/v3';\n\ntry {\n  let holidays;\n  if (mode === 'next' || mode === 'upcoming') {\n    holidays = await helpers.httpRequest({\n      method: 'GET',\n      url: BASE + '/NextPublicHolidays/' + countryCode\n    });\n  } else {\n    holidays = await helpers.httpRequest({\n      method: 'GET',\n      url: BASE + '/PublicHolidays/' + year + '/' + countryCode\n    });\n  }\n\n  if (!Array.isArray(holidays) || holidays.length === 0) {\n    return [{ json: { result: 'No public holidays found for ' + countryCode + ' (' + year + ').' } }];\n  }\n\n  let result = 'Public Holidays for ' + countryCode;\n  if (mode !== 'next' && mode !== 'upcoming') result += ' (' + year + ')';\n  result += ':\\n\\n';\n\n  for (const h of holidays) {\n    const dateStr = h.date;\n    const name = h.localName && h.localName !== h.name\n      ? h.localName + ' (' + h.name + ')'\n      : h.name;\n    const types = h.types ? h.types.join(', ') : '';\n    result += '- ' + dateStr + ': ' + name;\n    if (types && types !== 'Public') result += ' [' + types + ']';\n    result += '\\n';\n  }\n\n  result += '\\nTotal: ' + holidays.length + ' holidays';\n  return [{ json: { result } }];\n} catch (err) {\n  if (err.message && err.message.includes('404')) {\n    return [{ json: { error: 'Country code \"' + countryCode + '\" not found. Use ISO 3166-1 alpha-2 codes (e.g. DE, US, AT, CH, FR).' } }];\n  }\n  return [{ json: { error: 'Failed to fetch holidays: ' + err.message } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Get Holidays", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Public Holidays",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "public-holidays"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "get_public_holidays",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "get_public_holidays",
+          "description": "Get public holidays for a country. Parameters: country_code (ISO 3166-1 alpha-2, e.g. DE, US, AT, CH, FR), year (optional, default current year), mode (optional: 'year' for full year or 'next' for upcoming holidays only)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "country_code": "={{ $fromAI('country_code', 'ISO 3166-1 alpha-2 country code (e.g. DE, US, AT)', 'string') }}",
+              "year": "={{ $fromAI('year', 'Year for holidays (e.g. 2026). Optional, defaults to current year', 'string') }}",
+              "mode": "={{ $fromAI('mode', 'Mode: year (full year) or next (upcoming only). Optional, default year', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "country_code",
+                "displayName": "country_code",
+                "type": "string",
+                "description": "ISO 3166-1 alpha-2 country code (e.g. DE, US, AT)",
+                "required": true
+              },
+              {
+                "id": "year",
+                "displayName": "year",
+                "type": "string",
+                "description": "Year for holidays (e.g. 2026). Optional, defaults to current year",
+                "required": false
+              },
+              {
+                "id": "mode",
+                "displayName": "mode",
+                "type": "string",
+                "description": "Mode: year (full year) or next (upcoming only). Optional, default year",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "get_public_holidays": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}
