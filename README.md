@@ -9,6 +9,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 | Category | Skill | Description | Credentials | Author |
 |----------|-------|-------------|-------------|--------|
 | communication | [email-imap-smtp](templates/email-imap-smtp/) | Read and send emails via IMAP/SMTP | Email address, password, IMAP host, SMTP host | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| finance | [crypto-prices](templates/crypto-prices/) | Get cryptocurrency prices, market cap, and 24h changes | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | finance | [exchange-rates](templates/exchange-rates/) | Convert currencies using live exchange rates | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | knowledge | [wikipedia](templates/wikipedia/) | Search Wikipedia and get article summaries | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | language | [dictionary](templates/dictionary/) | English word definitions, phonetics, and examples | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |

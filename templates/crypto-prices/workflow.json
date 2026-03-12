@@ -1,0 +1,103 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Crypto Prices",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Get Crypto Price",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst coin = (input.coin || 'bitcoin').toLowerCase().trim();\nconst currency = (input.currency || 'eur').toLowerCase().trim();\n\ntry {\n  // First try direct ID lookup\n  const data = await helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.coingecko.com/api/v3/simple/price?ids=' + encodeURIComponent(coin) + '&vs_currencies=' + currency + '&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true'\n  });\n\n  if (!data[coin]) {\n    // Try search to find the coin ID\n    const search = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.coingecko.com/api/v3/search?query=' + encodeURIComponent(coin)\n    });\n\n    if (!search.coins || search.coins.length === 0) {\n      return [{ json: { error: 'Cryptocurrency \"' + coin + '\" not found. Try the full name (e.g. bitcoin, ethereum, solana).' } }];\n    }\n\n    const coinId = search.coins[0].id;\n    const coinName = search.coins[0].name;\n    const coinSymbol = search.coins[0].symbol;\n\n    const data2 = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.coingecko.com/api/v3/simple/price?ids=' + coinId + '&vs_currencies=' + currency + '&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true'\n    });\n\n    if (!data2[coinId]) {\n      return [{ json: { error: 'Could not fetch price for ' + coinName + '.' } }];\n    }\n\n    const p = data2[coinId];\n    const cur = currency.toUpperCase();\n    const change = p[currency + '_24h_change'];\n    const changeStr = change !== undefined ? (change >= 0 ? '+' : '') + change.toFixed(2) + '%' : 'N/A';\n    const mcap = p[currency + '_market_cap'];\n    const mcapStr = mcap ? mcap.toLocaleString('en-US') : 'N/A';\n    const vol = p[currency + '_24h_vol'];\n    const volStr = vol ? vol.toLocaleString('en-US') : 'N/A';\n\n    let result = coinName + ' (' + coinSymbol.toUpperCase() + ')\\n';\n    result += '  Price: ' + p[currency].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 8}) + ' ' + cur + '\\n';\n    result += '  24h Change: ' + changeStr + '\\n';\n    result += '  Market Cap: ' + mcapStr + ' ' + cur + '\\n';\n    result += '  24h Volume: ' + volStr + ' ' + cur;\n    return [{ json: { result } }];\n  }\n\n  const p = data[coin];\n  const cur = currency.toUpperCase();\n  const change = p[currency + '_24h_change'];\n  const changeStr = change !== undefined ? (change >= 0 ? '+' : '') + change.toFixed(2) + '%' : 'N/A';\n  const mcap = p[currency + '_market_cap'];\n  const mcapStr = mcap ? mcap.toLocaleString('en-US') : 'N/A';\n  const vol = p[currency + '_24h_vol'];\n  const volStr = vol ? vol.toLocaleString('en-US') : 'N/A';\n\n  let result = coin.charAt(0).toUpperCase() + coin.slice(1) + '\\n';\n  result += '  Price: ' + p[currency].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 8}) + ' ' + cur + '\\n';\n  result += '  24h Change: ' + changeStr + '\\n';\n  result += '  Market Cap: ' + mcapStr + ' ' + cur + '\\n';\n  result += '  24h Volume: ' + volStr + ' ' + cur;\n  return [{ json: { result } }];\n\n} catch (err) {\n  if (err.message && err.message.includes('429')) {\n    return [{ json: { error: 'Rate limit exceeded (CoinGecko free: 30 calls/min). Please try again in a moment.' } }];\n  }\n  return [{ json: { error: 'Failed to fetch crypto price: ' + err.message } }];\n}"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Get Crypto Price", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Crypto Prices",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "crypto-prices"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "get_crypto_price",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "get_crypto_price",
+          "description": "Get current cryptocurrency price, 24h change, and market cap. Parameters: coin (name or ID like 'bitcoin', 'ethereum', 'solana'), currency (optional, target currency like 'eur', 'usd', default 'eur')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "coin": "={{ $fromAI('coin', 'Cryptocurrency name or ID (e.g. bitcoin, ethereum, solana)', 'string') }}",
+              "currency": "={{ $fromAI('currency', 'Target currency (e.g. eur, usd). Optional, default eur', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "coin",
+                "displayName": "coin",
+                "type": "string",
+                "description": "Cryptocurrency name or ID (e.g. bitcoin, ethereum, solana)",
+                "required": true
+              },
+              {
+                "id": "currency",
+                "displayName": "currency",
+                "type": "string",
+                "description": "Target currency (e.g. eur, usd). Optional, default eur",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "get_crypto_price": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}
