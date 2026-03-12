@@ -1,0 +1,38 @@
+{
+  "id": "github-api",
+  "name": "GitHub",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "productivity",
+  "description": "Search repositories, get repo info, list issues, and create issues on GitHub",
+  "credentials_required": [
+    {
+      "key": "github_pat",
+      "label": "GitHub Personal Access Token",
+      "hint": "Create at github.com/settings/tokens — needs 'repo' scope for private repos, or 'public_repo' for public only"
+    }
+  ],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "search_repos",
+      "description": "Search GitHub repositories by keyword"
+    },
+    {
+      "name": "get_repo_info",
+      "description": "Get detailed info about a specific GitHub repository"
+    },
+    {
+      "name": "list_issues",
+      "description": "List issues for a GitHub repository"
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new issue in a GitHub repository"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

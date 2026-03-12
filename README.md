@@ -53,6 +53,12 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 | [ip-geolocation](templates/ip-geolocation/) | Get location, ISP, and org info for any IP address | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [website-check](templates/website-check/) | Website health check: load time, security headers, meta tags, structured data | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
+### Productivity
+
+| Skill | Description | Credentials | Author |
+|-------|-------------|-------------|--------|
+| [github-api](templates/github-api/) | Search repos, get repo info, list and create issues | GitHub PAT | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+
 ### News
 
 | Skill | Description | Credentials | Author |

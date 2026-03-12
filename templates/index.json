@@ -166,6 +166,20 @@
       "version": "1.0.0"
     },
     {
+      "id": "github-api",
+      "name": "GitHub",
+      "type": "native",
+      "category": "productivity",
+      "description": "Search repositories, get repo info, list issues, and create issues on GitHub",
+      "credentials_required": [
+        {
+          "key": "github_pat",
+          "label": "GitHub Personal Access Token"
+        }
+      ],
+      "version": "1.0.0"
+    },
+    {
       "id": "tmdb-movies",
       "name": "TMDB Movies & TV",
       "type": "native",
