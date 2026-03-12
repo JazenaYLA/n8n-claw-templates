@@ -1,0 +1,38 @@
+{
+  "id": "todoist",
+  "name": "Todoist",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "productivity",
+  "description": "Manage Todoist tasks: list, create, complete, and organize tasks with due dates and priorities",
+  "credentials_required": [
+    {
+      "key": "todoist_token",
+      "label": "Todoist API Token",
+      "hint": "Settings > Integrations > Developer in Todoist app"
+    }
+  ],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "list_tasks",
+      "description": "List tasks from Todoist, optionally filtered by project or filter expression"
+    },
+    {
+      "name": "create_task",
+      "description": "Create a new task in Todoist"
+    },
+    {
+      "name": "complete_task",
+      "description": "Mark a task as completed"
+    },
+    {
+      "name": "list_projects",
+      "description": "List all Todoist projects"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

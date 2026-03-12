@@ -1,0 +1,172 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Todoist",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Todoist Logic",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'list_tasks';\n\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst pgHeaders = {\n  'apikey': SUPABASE_KEY,\n  'Authorization': 'Bearer ' + SUPABASE_KEY\n};\n\nconst creds = await helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/template_credentials?template_id=eq.todoist&cred_key=eq.todoist_token&select=cred_value',\n  headers: pgHeaders\n});\n\nif (!creds || creds.length === 0 || !creds[0].cred_value) {\n  return [{ json: { error: 'Todoist API token not configured. Use add_credential to set it up.' } }];\n}\n\nconst token = creds[0].cred_value;\nconst apiHeaders = {\n  'Authorization': 'Bearer ' + token,\n  'Content-Type': 'application/json'\n};\n\nconst priorityLabels = { 1: '', 2: ' [P3]', 3: ' [P2]', 4: ' [P1]' };\n\nfunction formatTask(t) {\n  let line = '- ' + t.content;\n  if (t.priority > 1) line += priorityLabels[t.priority] || '';\n  if (t.due) {\n    line += ' (due: ' + (t.due.date || '') + ')';\n  }\n  if (t.description) line += '\\n  ' + t.description.substring(0, 100);\n  return line;\n}\n\n// === list_tasks ===\nif (action === 'list_tasks') {\n  try {\n    let url = 'https://api.todoist.com/rest/v2/tasks';\n    const params = [];\n    if (input.project_id) params.push('project_id=' + input.project_id);\n    if (input.filter) params.push('filter=' + encodeURIComponent(input.filter));\n    if (params.length > 0) url += '?' + params.join('&');\n\n    const tasks = await helpers.httpRequest({ method: 'GET', url, headers: apiHeaders });\n\n    if (!tasks || tasks.length === 0) {\n      return [{ json: { result: 'No tasks found.' } }];\n    }\n\n    let result = 'Tasks (' + tasks.length + '):\\n\\n';\n    for (const t of tasks.slice(0, 20)) {\n      result += formatTask(t) + '\\n  ID: ' + t.id + '\\n\\n';\n    }\n    if (tasks.length > 20) result += '(' + (tasks.length - 20) + ' more tasks not shown)';\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list tasks: ' + err.message } }];\n  }\n\n// === create_task ===\n} else if (action === 'create_task') {\n  const content = input.content;\n  if (!content) return [{ json: { error: 'Parameter \"content\" is required (task title).' } }];\n\n  try {\n    const body = { content };\n    if (input.description) body.description = input.description;\n    if (input.due_string) body.due_string = input.due_string;\n    if (input.priority) body.priority = parseInt(input.priority) || 1;\n    if (input.project_id) body.project_id = input.project_id;\n    if (input.labels) body.labels = input.labels.split(',').map(l => l.trim());\n\n    const task = await helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.todoist.com/rest/v2/tasks',\n      headers: apiHeaders,\n      body: JSON.stringify(body)\n    });\n\n    const parsed = typeof task === 'string' ? JSON.parse(task) : task;\n    let result = 'Task created: ' + parsed.content;\n    if (parsed.due) result += ' (due: ' + parsed.due.date + ')';\n    result += '\\nID: ' + parsed.id;\n    result += '\\nURL: ' + parsed.url;\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to create task: ' + err.message } }];\n  }\n\n// === complete_task ===\n} else if (action === 'complete_task') {\n  const taskId = input.task_id;\n  if (!taskId) return [{ json: { error: 'Parameter \"task_id\" is required.' } }];\n\n  try {\n    await helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.todoist.com/rest/v2/tasks/' + taskId + '/close',\n      headers: apiHeaders\n    });\n    return [{ json: { result: 'Task ' + taskId + ' marked as completed.' } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to complete task: ' + err.message } }];\n  }\n\n// === list_projects ===\n} else if (action === 'list_projects') {\n  try {\n    const projects = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.todoist.com/rest/v2/projects',\n      headers: apiHeaders\n    });\n\n    if (!projects || projects.length === 0) {\n      return [{ json: { result: 'No projects found.' } }];\n    }\n\n    let result = 'Projects (' + projects.length + '):\\n\\n';\n    for (const p of projects) {\n      result += '- **' + p.name + '** (ID: ' + p.id + ')';\n      if (p.is_favorite) result += ' [favorite]';\n      result += '\\n';\n    }\n\n    return [{ json: { result } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to list projects: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use list_tasks, create_task, complete_task, or list_projects.' } }];\n}\n"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Todoist Logic", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Todoist",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "todoist"
+        }
+      },
+      {
+        "id": "tool-list-tasks",
+        "name": "list_tasks",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "list_tasks",
+          "description": "List tasks from Todoist. Parameters: project_id (filter by project ID, optional), filter (Todoist filter expression like 'today', 'overdue', 'p1', optional)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "list_tasks",
+              "project_id": "={{ $fromAI('project_id', 'Project ID to filter by (optional)', 'string') }}",
+              "filter": "={{ $fromAI('filter', 'Todoist filter: today, overdue, p1, etc. (optional)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "project_id", "displayName": "project_id", "type": "string", "description": "Project ID", "required": false },
+              { "id": "filter", "displayName": "filter", "type": "string", "description": "Todoist filter expression", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-create-task",
+        "name": "create_task",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 300],
+        "parameters": {
+          "name": "create_task",
+          "description": "Create a new task in Todoist. Parameters: content (task title, required), description (details, optional), due_string (natural language due date like 'tomorrow', 'next Monday', 'Jan 15', optional), priority (1-4 where 4 is highest/P1, optional), project_id (project ID, optional), labels (comma-separated label names, optional)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "create_task",
+              "content": "={{ $fromAI('content', 'Task title', 'string') }}",
+              "description": "={{ $fromAI('description', 'Task description (optional)', 'string') }}",
+              "due_string": "={{ $fromAI('due_string', 'Due date in natural language: tomorrow, next Monday, Jan 15 (optional)', 'string') }}",
+              "priority": "={{ $fromAI('priority', 'Priority 1-4 where 4=P1/highest (optional)', 'string') }}",
+              "project_id": "={{ $fromAI('project_id', 'Project ID (optional)', 'string') }}",
+              "labels": "={{ $fromAI('labels', 'Comma-separated label names (optional)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "content", "displayName": "content", "type": "string", "description": "Task title", "required": true },
+              { "id": "description", "displayName": "description", "type": "string", "description": "Task description", "required": false },
+              { "id": "due_string", "displayName": "due_string", "type": "string", "description": "Due date", "required": false },
+              { "id": "priority", "displayName": "priority", "type": "string", "description": "Priority 1-4", "required": false },
+              { "id": "project_id", "displayName": "project_id", "type": "string", "description": "Project ID", "required": false },
+              { "id": "labels", "displayName": "labels", "type": "string", "description": "Labels", "required": false }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-complete-task",
+        "name": "complete_task",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [500, 300],
+        "parameters": {
+          "name": "complete_task",
+          "description": "Mark a Todoist task as completed. Parameter: task_id (the task ID, required — get IDs from list_tasks)",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "complete_task",
+              "task_id": "={{ $fromAI('task_id', 'Task ID to complete', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true },
+              { "id": "task_id", "displayName": "task_id", "type": "string", "description": "Task ID", "required": true }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-list-projects",
+        "name": "list_projects",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [750, 300],
+        "parameters": {
+          "name": "list_projects",
+          "description": "List all Todoist projects with their IDs. No parameters needed.",
+          "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "list_projects"
+            },
+            "matchingColumns": [],
+            "schema": [
+              { "id": "action", "displayName": "action", "type": "string", "description": "Action type", "required": true }
+            ],
+            "attemptToConvertTypes": false, "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "list_tasks": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "create_task": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "complete_task": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] },
+      "list_projects": { "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]] }
+    }
+  }
+}

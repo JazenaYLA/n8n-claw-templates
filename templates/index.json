@@ -166,6 +166,20 @@
       "version": "1.0.0"
     },
     {
+      "id": "todoist",
+      "name": "Todoist",
+      "type": "native",
+      "category": "productivity",
+      "description": "Manage Todoist tasks: list, create, complete, and organize with due dates and priorities",
+      "credentials_required": [
+        {
+          "key": "todoist_token",
+          "label": "Todoist API Token"
+        }
+      ],
+      "version": "1.0.0"
+    },
+    {
       "id": "github-api",
       "name": "GitHub",
       "type": "native",
