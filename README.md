@@ -16,6 +16,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 | network | [website-check](templates/website-check/) | Website health check: load time, security headers, meta tags, structured data | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | news | [hackernews](templates/hackernews/) | Search Hacker News stories and get top stories | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | news | [news-newsapi](templates/news-newsapi/) | Search news articles from 80,000+ sources | NewsAPI Key | [@freddy-schuetz](https://github.com/freddy-schuetz) |
+| reference | [country-info](templates/country-info/) | Country details: capital, population, languages, currencies | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | reference | [public-holidays](templates/public-holidays/) | Look up public holidays for any country | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | transport | [wiener-linien](templates/wiener-linien/) | Plan routes with Vienna public transport (Wiener Linien), get your station ID from [this CSV File](https://data.wien.gv.at/csv/wienerlinien-ogd-haltestellen.csv) (yes, a CSV file, don't ask), more details can be found on the [Wiener Linien Routingservice Wien](https://www.data.gv.at/datasets/9c203fec-dc0d-412c-a7a3-7fd77d0346f1?locale=de) page | None | [@lcx](https://github.com/lcx) |
 | utilities | [qr-code](templates/qr-code/) | Generate QR codes from text or URLs | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |

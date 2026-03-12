@@ -112,6 +112,15 @@
       "version": "1.0.0"
     },
     {
+      "id": "country-info",
+      "name": "Country Info",
+      "type": "native",
+      "category": "reference",
+      "description": "Get country information: capital, population, languages, currencies, and more (REST Countries API, free)",
+      "credentials_required": [],
+      "version": "1.0.0"
+    },
+    {
       "id": "public-holidays",
       "name": "Public Holidays",
       "type": "native",

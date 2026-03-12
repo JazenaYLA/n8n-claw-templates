@@ -1,0 +1,95 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: Country Info",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "Get Country",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst query = input.query;\nif (!query) return [{ json: { error: 'Parameter \"query\" is required (country name or ISO code).' } }];\n\nconst fields = 'name,capital,population,area,region,subregion,languages,currencies,timezones,flag,cca2,cca3,borders';\nlet countries;\n\ntry {\n  // Try by name first\n  countries = await helpers.httpRequest({\n    method: 'GET',\n    url: 'https://restcountries.com/v3.1/name/' + encodeURIComponent(query) + '?fields=' + fields\n  });\n} catch (e1) {\n  try {\n    // Fallback: try as ISO code\n    countries = await helpers.httpRequest({\n      method: 'GET',\n      url: 'https://restcountries.com/v3.1/alpha/' + encodeURIComponent(query) + '?fields=' + fields\n    });\n    // alpha endpoint returns object, not array\n    if (!Array.isArray(countries)) countries = [countries];\n  } catch (e2) {\n    return [{ json: { error: 'Country not found: \"' + query + '\". Try a country name (e.g. Germany) or ISO code (e.g. DE).' } }];\n  }\n}\n\nif (!Array.isArray(countries)) countries = [countries];\nif (countries.length === 0) {\n  return [{ json: { error: 'No results for \"' + query + '\".' } }];\n}\n\nlet result = '';\nfor (const c of countries.slice(0, 3)) {\n  const name = c.name ? (c.name.common || c.name.official || query) : query;\n  const official = c.name ? c.name.official : '';\n  const capital = Array.isArray(c.capital) ? c.capital.join(', ') : (c.capital || 'N/A');\n  const pop = c.population ? c.population.toLocaleString('en-US') : 'N/A';\n  const area = c.area ? c.area.toLocaleString('en-US') + ' km²' : 'N/A';\n  const region = [c.region, c.subregion].filter(Boolean).join(' / ');\n  const langs = c.languages ? Object.values(c.languages).join(', ') : 'N/A';\n  const currs = c.currencies ? Object.entries(c.currencies).map(([code, info]) => info.name + ' (' + code + ', ' + (info.symbol || '') + ')').join(', ') : 'N/A';\n  const tz = Array.isArray(c.timezones) ? c.timezones.join(', ') : 'N/A';\n  const codes = [c.cca2, c.cca3].filter(Boolean).join(' / ');\n  const flag = c.flag || '';\n\n  result += flag + ' ' + name;\n  if (official && official !== name) result += ' (' + official + ')';\n  result += '\\n';\n  result += '  Codes: ' + codes + '\\n';\n  result += '  Capital: ' + capital + '\\n';\n  result += '  Population: ' + pop + '\\n';\n  result += '  Area: ' + area + '\\n';\n  result += '  Region: ' + region + '\\n';\n  result += '  Languages: ' + langs + '\\n';\n  result += '  Currencies: ' + currs + '\\n';\n  result += '  Timezones: ' + tz + '\\n';\n  if (c.borders && c.borders.length > 0) {\n    result += '  Borders: ' + c.borders.join(', ') + '\\n';\n  }\n  result += '\\n';\n}\n\nif (countries.length > 3) {\n  result += '(' + (countries.length - 3) + ' more results omitted)';\n}\n\nreturn [{ json: { result: result.trim() } }];"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "Get Country", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: Country Info",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "country-info"
+        }
+      },
+      {
+        "id": "tool-wf",
+        "name": "get_country_info",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "get_country_info",
+          "description": "Get detailed information about a country. Parameter: query (country name like 'Germany' or ISO code like 'DE')",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "query": "={{ $fromAI('query', 'Country name or ISO code (e.g. Germany, DE, United States, US)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "Country name or ISO code (e.g. Germany, DE, United States, US)",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "get_country_info": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

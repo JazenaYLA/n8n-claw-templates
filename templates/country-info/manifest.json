@@ -1,0 +1,20 @@
+{
+  "id": "country-info",
+  "name": "Country Info",
+  "version": "1.0.0",
+  "updated": "2026-03-12",
+  "type": "native",
+  "category": "reference",
+  "description": "Get country information: capital, population, languages, currencies, and more (REST Countries API, free)",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "get_country_info",
+      "description": "Look up detailed information about a country by name or code"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}
