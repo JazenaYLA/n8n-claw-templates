@@ -1,0 +1,24 @@
+{
+  "id": "openfoodfacts",
+  "name": "OpenFoodFacts",
+  "version": "1.0.0",
+  "updated": "2026-03-13",
+  "type": "native",
+  "category": "knowledge",
+  "description": "Look up food products by barcode or name — nutrition facts, Nutri-Score, allergens, ingredients (4M+ products, no API key needed)",
+  "credentials_required": [],
+  "credentials_optional": [],
+  "tools": [
+    {
+      "name": "lookup_barcode",
+      "description": "Look up a food product by its barcode (EAN-8 or EAN-13)"
+    },
+    {
+      "name": "search_food",
+      "description": "Search for food products by name or keyword"
+    }
+  ],
+  "author": "freddy-schuetz",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4"
+}

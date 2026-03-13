@@ -1,0 +1,156 @@
+{
+  "format": "n8n-claw-template",
+  "format_version": 1,
+  "sub": {
+    "name": "MCP Sub: OpenFoodFacts",
+    "settings": {
+      "executionOrder": "v1",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "nodes": [
+      {
+        "id": "sub-trigger",
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [0, 0],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "sub-code",
+        "name": "OpenFoodFacts Logic",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [256, 0],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst action = input.action || 'search_food';\n\nconst UA = 'n8n-claw/1.0 (github.com/freddy-schuetz/n8n-claw)';\nconst BASE = 'https://world.openfoodfacts.org';\nconst FIELDS = 'product_name,brands,quantity,nutriscore_grade,nova_group,ecoscore_grade,nutriments,ingredients_text,allergens_tags,labels_tags,categories_tags_en,serving_size';\n\nfunction formatProduct(p) {\n  let out = '';\n  const name = p.product_name || 'Unknown';\n  const brand = p.brands || '';\n  out += name + (brand ? ' (' + brand + ')' : '') + '\\n';\n  if (p.quantity) out += '  Size: ' + p.quantity + '\\n';\n  if (p.nutriscore_grade) out += '  Nutri-Score: ' + p.nutriscore_grade.toUpperCase() + '\\n';\n  if (p.nova_group) out += '  NOVA group: ' + p.nova_group + '/4\\n';\n  if (p.ecoscore_grade) out += '  Eco-Score: ' + p.ecoscore_grade.toUpperCase() + '\\n';\n  if (p.nutriments) {\n    const n = p.nutriments;\n    out += '  Nutrition per 100g:';\n    if (n['energy-kcal_100g'] !== undefined) out += ' ' + n['energy-kcal_100g'] + ' kcal,';\n    if (n.fat_100g !== undefined) out += ' Fat ' + n.fat_100g + 'g,';\n    if (n.carbohydrates_100g !== undefined) out += ' Carbs ' + n.carbohydrates_100g + 'g,';\n    if (n.sugars_100g !== undefined) out += ' Sugars ' + n.sugars_100g + 'g,';\n    if (n.proteins_100g !== undefined) out += ' Protein ' + n.proteins_100g + 'g,';\n    if (n.salt_100g !== undefined) out += ' Salt ' + n.salt_100g + 'g,';\n    if (n.fiber_100g !== undefined) out += ' Fiber ' + n.fiber_100g + 'g';\n    out = out.replace(/,$/, '') + '\\n';\n  }\n  if (p.allergens_tags && p.allergens_tags.length > 0) {\n    out += '  Allergens: ' + p.allergens_tags.map(a => a.replace('en:', '')).join(', ') + '\\n';\n  }\n  if (p.labels_tags && p.labels_tags.length > 0) {\n    const labels = p.labels_tags.slice(0, 5).map(l => l.replace('en:', '')).join(', ');\n    out += '  Labels: ' + labels + '\\n';\n  }\n  if (p.ingredients_text) {\n    const ingr = p.ingredients_text.length > 300 ? p.ingredients_text.substring(0, 300) + '...' : p.ingredients_text;\n    out += '  Ingredients: ' + ingr + '\\n';\n  }\n  return out.trim();\n}\n\nif (action === 'lookup_barcode') {\n  const barcode = (input.barcode || '').trim();\n  if (!barcode) {\n    return [{ json: { error: 'Parameter \"barcode\" is required. Provide an EAN-8 or EAN-13 barcode number.' } }];\n  }\n\n  try {\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: BASE + '/api/v2/product/' + encodeURIComponent(barcode) + '.json?fields=' + FIELDS,\n      headers: { 'User-Agent': UA }\n    });\n\n    const parsed = typeof data === 'string' ? JSON.parse(data) : data;\n\n    if (!parsed.product || parsed.status === 0) {\n      return [{ json: { result: 'Product not found for barcode ' + barcode + '. The product may not be in the OpenFoodFacts database.' } }];\n    }\n\n    return [{ json: { result: formatProduct(parsed.product) } }];\n  } catch (err) {\n    return [{ json: { error: 'Failed to look up barcode: ' + err.message } }];\n  }\n\n} else if (action === 'search_food') {\n  const query = (input.query || '').trim();\n  if (!query) {\n    return [{ json: { error: 'Parameter \"query\" is required. Provide a product name or search term.' } }];\n  }\n\n  const limit = Math.min(Math.max(parseInt(input.limit) || 5, 1), 10);\n\n  try {\n    const searchFields = 'code,product_name,brands,nutriscore_grade,nova_group,nutriments,allergens_tags,quantity';\n    const url = BASE + '/cgi/search.pl?search_terms=' + encodeURIComponent(query) + '&search_simple=1&action=process&json=1&page_size=' + limit + '&fields=' + searchFields;\n\n    const data = await helpers.httpRequest({\n      method: 'GET',\n      url: url,\n      headers: { 'User-Agent': UA }\n    });\n\n    const parsed = typeof data === 'string' ? JSON.parse(data) : data;\n\n    if (!parsed.products || parsed.products.length === 0) {\n      return [{ json: { result: 'No products found for \"' + query + '\". Try a different search term.' } }];\n    }\n\n    const total = parsed.count || parsed.products.length;\n    let result = 'Found ' + total + ' products for \"' + query + '\" (showing ' + parsed.products.length + '):\\n\\n';\n\n    for (let i = 0; i < parsed.products.length; i++) {\n      const p = parsed.products[i];\n      const name = p.product_name || 'Unknown';\n      const brand = p.brands || '';\n      result += (i + 1) + '. ' + name + (brand ? ' (' + brand + ')' : '');\n      if (p.quantity) result += ' — ' + p.quantity;\n      result += '\\n';\n      if (p.nutriscore_grade) result += '   Nutri-Score: ' + p.nutriscore_grade.toUpperCase();\n      if (p.nova_group) result += '  NOVA: ' + p.nova_group + '/4';\n      if (p.nutriments && p.nutriments['energy-kcal_100g'] !== undefined) result += '  ' + p.nutriments['energy-kcal_100g'] + ' kcal/100g';\n      result += '\\n';\n      if (p.allergens_tags && p.allergens_tags.length > 0) {\n        result += '   Allergens: ' + p.allergens_tags.map(a => a.replace('en:', '')).join(', ') + '\\n';\n      }\n      if (p.code) result += '   Barcode: ' + p.code + '\\n';\n      result += '\\n';\n    }\n\n    return [{ json: { result: result.trim() } }];\n  } catch (err) {\n    if (err.message && err.message.includes('429')) {\n      return [{ json: { error: 'Rate limit exceeded (OpenFoodFacts: 10 searches/min). Please try again in a moment.' } }];\n    }\n    return [{ json: { error: 'Food search failed: ' + err.message } }];\n  }\n\n} else {\n  return [{ json: { error: 'Unknown action: ' + action + '. Use lookup_barcode or search_food.' } }];\n}\n"
+        }
+      }
+    ],
+    "connections": {
+      "Execute Workflow Trigger": {
+        "main": [[{ "node": "OpenFoodFacts Logic", "type": "main", "index": 0 }]]
+      }
+    }
+  },
+  "server": {
+    "name": "MCP: OpenFoodFacts",
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "mcp-trigger",
+        "name": "MCP Server Trigger",
+        "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+        "typeVersion": 2,
+        "position": [0, 0],
+        "parameters": {
+          "path": "openfoodfacts"
+        }
+      },
+      {
+        "id": "tool-barcode",
+        "name": "lookup_barcode",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [0, 300],
+        "parameters": {
+          "name": "lookup_barcode",
+          "description": "Look up a food product by its barcode (EAN-8 or EAN-13). Returns nutrition facts, Nutri-Score, NOVA group, Eco-Score, allergens, ingredients, and labels. Parameter: barcode (the barcode number, required)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "lookup_barcode",
+              "barcode": "={{ $fromAI('barcode', 'The product barcode number (EAN-8 or EAN-13)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "barcode",
+                "displayName": "barcode",
+                "type": "string",
+                "description": "The product barcode number (EAN-8 or EAN-13)",
+                "required": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      },
+      {
+        "id": "tool-search",
+        "name": "search_food",
+        "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+        "typeVersion": 2.2,
+        "position": [250, 300],
+        "parameters": {
+          "name": "search_food",
+          "description": "Search for food products by name or keyword. Returns a list of matching products with nutrition facts, Nutri-Score, allergens, and barcodes. Parameters: query (search term like 'Nutella' or 'oat milk', required), limit (number of results 1-10, optional, default 5)",
+          "workflowId": {
+            "__rl": true,
+            "value": "REPLACE_SUB_WORKFLOW_ID",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "action": "search_food",
+              "query": "={{ $fromAI('query', 'Search term — product name, brand, or food type', 'string') }}",
+              "limit": "={{ $fromAI('limit', 'Number of results to return (1-10, default 5)', 'string') }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "action",
+                "displayName": "action",
+                "type": "string",
+                "description": "Action type",
+                "required": true
+              },
+              {
+                "id": "query",
+                "displayName": "query",
+                "type": "string",
+                "description": "Search term — product name, brand, or food type",
+                "required": true
+              },
+              {
+                "id": "limit",
+                "displayName": "limit",
+                "type": "string",
+                "description": "Number of results to return (1-10, default 5)",
+                "required": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "lookup_barcode": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      },
+      "search_food": {
+        "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+      }
+    }
+  }
+}

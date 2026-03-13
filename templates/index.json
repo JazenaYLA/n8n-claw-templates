@@ -280,6 +280,15 @@
         }
       ],
       "version": "1.0.0"
+    },
+    {
+      "id": "openfoodfacts",
+      "name": "OpenFoodFacts",
+      "type": "native",
+      "category": "knowledge",
+      "description": "Look up food products by barcode or name — nutrition facts, Nutri-Score, allergens, ingredients (4M+ products, no API key needed)",
+      "credentials_required": [],
+      "version": "1.0.0"
     }
   ]
 }

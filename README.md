@@ -32,6 +32,7 @@ Skill catalog for [n8n-claw](https://github.com/freddy-schuetz/n8n-claw) MCP ser
 
 | Skill | Description | Credentials | Author |
 |-------|-------------|-------------|--------|
+| [OpenFoodFacts](https://world.openfoodfacts.org/) | Look up food products by barcode or name — nutrition facts, Nutri-Score, allergens, ingredients | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 | [Wikipedia](https://www.wikipedia.org/) | Search Wikipedia and get article summaries | None | [@freddy-schuetz](https://github.com/freddy-schuetz) |
 
 ### Language
