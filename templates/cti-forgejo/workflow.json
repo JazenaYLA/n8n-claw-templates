@@ -1,0 +1,90 @@
+{
+  "name": "[CTI] Forgejo MCP Bridge",
+  "_claw_template_id": "cti-forgejo",
+  "_doc": "Two-workflow template: sub-workflow handles individual tool calls against the forgejo-mcp SSE server; server workflow exposes all tools as an MCP server endpoint for the yaoc2 Brain to consume.",
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "tool", "type": "string" },
+            { "name": "args", "type": "object" }
+          ]
+        }
+      },
+      "id": "sub-trigger",
+      "name": "Sub — Input (tool + args)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tool = $input.item.json.tool;\nconst args = $input.item.json.args ?? {};\nconst sseUrl = $vars.FORGEJO_MCP_SSE_URL;\nconst verifySSL = ($vars.FORGEJO_VERIFY_SSL ?? 'false') !== 'false';\n\nif (!tool) throw new Error('tool parameter is required');\nif (!sseUrl) throw new Error('FORGEJO_MCP_SSE_URL workflow variable is not set');\n\n// Build MCP call payload (JSON-RPC 2.0 over HTTP)\nconst payload = {\n  jsonrpc: '2.0',\n  method: 'tools/call',\n  params: { name: tool, arguments: args },\n  id: crypto.randomUUID()\n};\n\nreturn [{ json: { payload, sseUrl, verifySSL } }];"
+      },
+      "id": "build-mcp-call",
+      "name": "Build MCP Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.sseUrl.replace('/sse', '') }}/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.FORGEJO_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "call-forgejo-mcp",
+      "name": "Call forgejo-mcp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\nif (response.error) {\n  throw new Error(`forgejo-mcp error [${response.error.code}]: ${response.error.message}`);\n}\nconst result = response.result ?? response;\nreturn [{ json: { status: 'ok', result, tool: $('Sub — Input (tool + args)').first().json.tool } }];"
+      },
+      "id": "parse-response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "content": "## CTI Forgejo MCP Server\n\nThis workflow exposes the sub-workflow as an MCP server endpoint.\nThe yaoc2 Brain connects to this via SSE to call Forgejo tools.\n\n**Tools exposed:** forgejo_create_issue, forgejo_update_issue,\nforgejo_create_or_update_file, forgejo_get_file,\nforgejo_create_pull_request, forgejo_dispatch_workflow,\nforgejo_list_workflow_runs, forgejo_list_notifications\n\n**Connection:** Brain AI Agent → MCP Client node → this workflow's SSE endpoint"
+      },
+      "id": "server-note",
+      "name": "Server Workflow Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 300]
+    }
+  ],
+  "connections": {
+    "Sub — Input (tool + args)": { "main": [[{ "node": "Build MCP Call", "type": "main", "index": 0 }]] },
+    "Build MCP Call": { "main": [[{ "node": "Call forgejo-mcp", "type": "main", "index": 0 }]] },
+    "Call forgejo-mcp": { "main": [[{ "node": "Parse Response", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "tags": ["cti", "forgejo", "mcp", "claw-template"]
+}

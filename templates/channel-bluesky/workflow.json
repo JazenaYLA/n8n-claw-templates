@@ -1,0 +1,166 @@
+{
+  "name": "[Channel] Bluesky (AT Protocol)",
+  "_claw_template_id": "channel-bluesky",
+  "_doc": "Bluesky channel adapter. Sub-workflow normalizes AT Protocol events into YAOC2 ChannelMessage shape. Server workflow exposes bluesky_post, bluesky_reply, bluesky_search_mentions as MCP tools.",
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "tool", "type": "string" },
+            { "name": "args", "type": "object" }
+          ]
+        }
+      },
+      "id": "sub-trigger",
+      "name": "Sub — Input (tool + args)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tool = $input.item.json.tool;\nconst args = $input.item.json.args ?? {};\nconst handle = $vars.BLUESKY_HANDLE;\nconst appPassword = $vars.BLUESKY_APP_PASSWORD;\nconst pdsUrl = $vars.BLUESKY_PDS_URL ?? 'https://bsky.social';\n\nif (!tool) throw new Error('tool parameter is required');\nif (!handle || !appPassword) throw new Error('BLUESKY_HANDLE and BLUESKY_APP_PASSWORD must be set');\n\nreturn [{ json: { tool, args, handle, appPassword, pdsUrl } }];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.pdsUrl }}/xrpc/com.atproto.server.createSession",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ identifier: $json.handle, password: $json.appPassword }) }}",
+        "options": {}
+      },
+      "id": "auth-bluesky",
+      "name": "Auth — Create Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "post",
+              "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "combinator": "and", "conditions": [{ "leftValue": "={{ $('Validate Input').first().json.tool }}", "rightValue": "bluesky_post", "operator": { "type": "string", "operation": "equals" }, "id": "t-post" }] },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "reply",
+              "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "combinator": "and", "conditions": [{ "leftValue": "={{ $('Validate Input').first().json.tool }}", "rightValue": "bluesky_reply", "operator": { "type": "string", "operation": "equals" }, "id": "t-reply" }] },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "search",
+              "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "combinator": "and", "conditions": [{ "leftValue": "={{ $('Validate Input').first().json.tool }}", "rightValue": "bluesky_search_mentions", "operator": { "type": "string", "operation": "equals" }, "id": "t-search" }] },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "normalize",
+              "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "combinator": "and", "conditions": [{ "leftValue": "={{ $('Validate Input').first().json.tool }}", "rightValue": "bluesky_normalize_event", "operator": { "type": "string", "operation": "equals" }, "id": "t-normalize" }] },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "tool-route",
+      "name": "Route by Tool",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Validate Input').first().json.pdsUrl }}/xrpc/com.atproto.repo.createRecord",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $('Auth — Create Session').first().json.accessJwt }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ repo: $('Auth — Create Session').first().json.did, collection: 'app.bsky.feed.post', record: { '$type': 'app.bsky.feed.post', text: ($('Validate Input').first().json.args.text ?? '').substring(0, 300), createdAt: new Date().toISOString() } }) }}",
+        "options": {}
+      },
+      "id": "exec-post",
+      "name": "Execute — Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize AT Protocol event to standard YAOC2 ChannelMessage\nconst event = $('Validate Input').first().json.args.event ?? {};\nconst author = event.author ?? event.post?.author ?? {};\nconst record = event.record ?? event.post?.record ?? {};\n\nconst channelMessage = {\n  channel: 'bluesky',\n  user_id: author.did ?? 'unknown',\n  display_name: author.handle ?? author.displayName ?? 'unknown',\n  text: record.text ?? event.text ?? '',\n  thread_id: event.uri ?? event.post?.uri ?? null,\n  reply_to: record.reply?.parent?.uri ?? null,\n  timestamp: record.createdAt ?? event.indexedAt ?? new Date().toISOString()\n};\n\nreturn [{ json: channelMessage }];"
+      },
+      "id": "exec-normalize",
+      "name": "Execute — Normalize Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Validate Input').first().json.pdsUrl }}/xrpc/app.bsky.feed.searchPosts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $('Auth — Create Session').first().json.accessJwt }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "q", "value": "={{ $('Validate Input').first().json.args.query ?? $('Validate Input').first().json.args.handle }}" },
+            { "name": "limit", "value": "={{ $('Validate Input').first().json.args.limit ?? 25 }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "exec-search",
+      "name": "Execute — Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0]
+    }
+  ],
+  "connections": {
+    "Sub — Input (tool + args)": { "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]] },
+    "Validate Input": { "main": [[{ "node": "Auth — Create Session", "type": "main", "index": 0 }]] },
+    "Auth — Create Session": { "main": [[{ "node": "Route by Tool", "type": "main", "index": 0 }]] },
+    "Route by Tool": {
+      "main": [
+        [{ "node": "Execute — Post", "type": "main", "index": 0 }],
+        [{ "node": "Execute — Post", "type": "main", "index": 0 }],
+        [{ "node": "Execute — Search", "type": "main", "index": 0 }],
+        [{ "node": "Execute — Normalize Event", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "tags": ["channel", "bluesky", "at-protocol", "claw-template"]
+}

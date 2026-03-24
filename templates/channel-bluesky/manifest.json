@@ -1,0 +1,62 @@
+{
+  "id": "channel-bluesky",
+  "name": "Bluesky (AT Protocol)",
+  "version": "1.0.0",
+  "updated": "2026-03-24",
+  "type": "native",
+  "category": "communications",
+  "description": "Bluesky/AT Protocol channel adapter. Normalizes incoming Bluesky mentions and firehose events into the standard YAOC2 ChannelMessage shape, and exposes post/reply/search tools. Designed as a drop-in channel alongside the Telegram and WhatsApp adapters.",
+  "credentials_required": [
+    {
+      "key": "BLUESKY_HANDLE",
+      "label": "Bluesky Handle",
+      "hint": "Your full Bluesky handle, e.g. you.bsky.social"
+    },
+    {
+      "key": "BLUESKY_APP_PASSWORD",
+      "label": "Bluesky App Password",
+      "hint": "Generate at bsky.app → Settings → App Passwords. Do not use your main account password."
+    }
+  ],
+  "credentials_optional": [
+    {
+      "key": "BLUESKY_PDS_URL",
+      "label": "PDS Base URL",
+      "hint": "Personal Data Server URL. Defaults to https://bsky.social. Change if using a self-hosted PDS."
+    }
+  ],
+  "tools": [
+    {
+      "name": "bluesky_post",
+      "description": "Post a new skeet to Bluesky. Enforces 300-character limit, strips markdown formatting."
+    },
+    {
+      "name": "bluesky_reply",
+      "description": "Reply to a specific Bluesky post by AT URI."
+    },
+    {
+      "name": "bluesky_search_mentions",
+      "description": "Search recent posts mentioning a handle or keyword on Bluesky."
+    },
+    {
+      "name": "bluesky_normalize_event",
+      "description": "Normalize a raw Bluesky firehose or AppView event into a standard YAOC2 ChannelMessage. Output: {channel, user_id, display_name, text, thread_id, reply_to, timestamp}."
+    }
+  ],
+  "channel_message_schema": {
+    "description": "Standard shape all channel adapter tools output for ingestion by yaoc2 policy gateway",
+    "fields": {
+      "channel": "string — e.g. 'bluesky'",
+      "user_id": "string — platform-native user ID (DID for Bluesky)",
+      "display_name": "string — human-readable name",
+      "text": "string — raw message text",
+      "thread_id": "string or null — platform thread/conversation ID",
+      "reply_to": "string or null — ID of message being replied to",
+      "timestamp": "ISO 8601 string"
+    }
+  },
+  "author": "JazenaYLA",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4",
+  "notes": "The channel_message_schema field defines the standard contract all channel adapter templates must conform to. When adding Twitter/X, Discord, or other channel adapters, ensure the normalize_event tool outputs this exact shape so yaoc2 ingress can consume all channels uniformly."
+}

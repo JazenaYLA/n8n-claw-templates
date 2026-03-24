@@ -1,0 +1,71 @@
+{
+  "id": "cti-forgejo",
+  "name": "Forgejo (Internal CTI)",
+  "version": "1.0.0",
+  "updated": "2026-03-24",
+  "type": "native",
+  "category": "cti",
+  "description": "Internal Forgejo instance bridge via forgejo-mcp SSE server. Exposes issue tracking, file push, workflow dispatch, and PR operations as MCP tools for CTI/threat-intel pipelines. Requires a running forgejo-mcp SSE sidecar (see Dockge stack in enterprise branch).",
+  "credentials_required": [
+    {
+      "key": "FORGEJO_MCP_SSE_URL",
+      "label": "Forgejo MCP SSE Endpoint",
+      "hint": "URL of the running forgejo-mcp SSE server, e.g. http://forgejo-mcp:8080/sse or http://192.168.101.x:8080/sse"
+    },
+    {
+      "key": "FORGEJO_TOKEN",
+      "label": "Forgejo Personal Access Token",
+      "hint": "Generate at your Forgejo instance: Settings → Applications → Access Tokens. Scope: repo, issue, write:repository"
+    }
+  ],
+  "credentials_optional": [
+    {
+      "key": "FORGEJO_URL",
+      "label": "Forgejo Instance Base URL",
+      "hint": "Base URL of your Forgejo instance, e.g. https://forgejo.lab.internal. Used for direct API fallback if SSE server is unreachable."
+    },
+    {
+      "key": "FORGEJO_VERIFY_SSL",
+      "label": "Verify SSL (true/false)",
+      "hint": "Set to false for internal CAs or self-signed certs. Lab environments typically require false."
+    }
+  ],
+  "tools": [
+    {
+      "name": "forgejo_create_issue",
+      "description": "Create a new issue in a Forgejo repository. Use for tracking threat actor TTPs, IOC reports, or pipeline failures."
+    },
+    {
+      "name": "forgejo_update_issue",
+      "description": "Update an existing issue (title, body, state, labels). Use for updating threat intel tickets."
+    },
+    {
+      "name": "forgejo_create_or_update_file",
+      "description": "Create or update a file in a Forgejo repository. Use for pushing IOC feeds, STIX bundles, or YARA rules."
+    },
+    {
+      "name": "forgejo_get_file",
+      "description": "Read a file from a Forgejo repository."
+    },
+    {
+      "name": "forgejo_create_pull_request",
+      "description": "Open a PR proposing threat intel updates for peer review."
+    },
+    {
+      "name": "forgejo_dispatch_workflow",
+      "description": "Trigger a Forgejo Actions workflow run. Use to kick off CTI enrichment pipelines on new intel."
+    },
+    {
+      "name": "forgejo_list_workflow_runs",
+      "description": "List recent Forgejo Actions workflow runs. Use to monitor CTI pipeline health."
+    },
+    {
+      "name": "forgejo_list_notifications",
+      "description": "List unread Forgejo notifications for the authenticated user."
+    }
+  ],
+  "author": "JazenaYLA",
+  "license": "MIT",
+  "tested_n8n_version": "2.10.4",
+  "notes": "This template requires a running forgejo-mcp SSE sidecar. The enterprise branch Dockge compose stack (opt/stacks/forgejo-mcp/) handles this. SSL verification is disabled by default for lab environments with internal CAs — set FORGEJO_VERIFY_SSL=true in production."
+}
